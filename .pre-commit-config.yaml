@@ -1,0 +1,46 @@
+# commit、commit-msg 時由 git 全域 hook 自動執行（不用 pre-commit install）。
+# 完整檢查：pre-commit run --all-files
+
+# 沒寫 stages 的 hook 只在 commit 與手動完整檢查時跑；commit-msg 那兩支自己寫了 stages
+default_stages: [pre-commit, manual]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-added-large-files
+        args: [--maxkb=4096]
+      - id: check-case-conflict
+      - id: check-yaml
+
+  - repo: https://gitlab.com/bmares/check-json5
+    rev: v1.0.1
+    hooks:
+      - id: check-json5
+
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.24.2
+    hooks:
+      # 指定 node 版本，讓 pre-commit 自己下載，不吃 PATH 上剛好找到的 node（舊的 apt node 會讓安裝失敗）。
+      # 書的頁面有 .md 與 .mdx（Starlight 元件），兩種都檢查。
+      - id: markdownlint-cli2
+        language_version: 26.13.1
+        args: [--fix]
+        # hook 本身限定 types: [markdown]，要覆寫掉，.mdx 才會被選到
+        types: [file]
+        types_or: [markdown, mdx]
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.19.4
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+        additional_dependencies: [cz-conventional-gitmoji]
+
+  - repo: https://github.com/ljnsn/cz-conventional-gitmoji
+    rev: v0.7.0
+    hooks:
+      - id: conventional-gitmoji
+        stages: [commit-msg]

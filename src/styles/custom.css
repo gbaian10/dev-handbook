@@ -2,3 +2,8 @@
 .sl-markdown-content :is(td, th) code {
 	white-space: nowrap;
 }
+
+/* Tool names in the first column are links; keep them whole instead of breaking mid-word. */
+.sl-markdown-content td:first-child a {
+	white-space: nowrap;
+}

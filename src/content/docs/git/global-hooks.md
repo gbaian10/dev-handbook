@@ -64,6 +64,7 @@ git config --global --rename-section hook.pre-commit 'hook.pre-commit.pre-commit
 git config --global --rename-section hook.commit-msg 'hook.pre-commit.commit-msg'
 git config --global --rename-section hook.pre-push   'hook.pre-commit.pre-push'
 ```
+
 :::
 
 ## 不要再執行 pre-commit install

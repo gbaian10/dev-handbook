@@ -1,0 +1,19 @@
+# https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+# https://github.com/DavidAnson/markdownlint-cli2#configuration
+
+config:
+  MD013: false # Line length：中文段落不換行
+  MD024: false # Multiple headings with the same content
+  MD026: false # Trailing punctuation in heading
+  MD010: # Hard tabs：code block 裡保留（.gitconfig、<<-EOF heredoc、Makefile 要用 Tab）
+    code_blocks: false
+  MD033: # Inline HTML：Starlight 元件與按鍵樣式是刻意的
+    allowed_elements: [Steps, Tabs, TabItem, Card, CardGrid, kbd]
+
+overrides:
+  # .mdx 的 <Steps> 每一步用 ###、JSX 元件慣用 Tab 縮排
+  - filter: ['**/*.mdx']
+    combine: merge
+    config:
+      MD001: false # Heading levels should only increment by one level at a time
+      MD010: false # Hard tabs

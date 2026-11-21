@@ -1,49 +1,39 @@
-# Starlight Starter Kit: Basics
+# 開發環境手冊
 
-[![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
+從一台全新的 Ubuntu 開始，把開發環境裝起來的步驟與背後的觀念：zsh、mise、uv、chezmoi、Docker、ssh、git。
+用 [Starlight](https://starlight.astro.build)（Astro）寫成。
 
-```
-bun create astro@latest -- --template starlight
-```
+## 本機預覽
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
-
-## 🚀 Project Structure
-
-Inside of your Astro + Starlight project, you'll see the following folders and files:
-
-```
-.
-├── public/
-├── src/
-│   ├── assets/
-│   ├── content/
-│   │   └── docs/
-│   └── content.config.ts
-├── astro.config.mjs
-├── package.json
-└── tsconfig.json
+```bash
+bun install
+bun run dev              # http://localhost:4321
+bun run dev -- --host    # 同一個區網的其他裝置也能看
 ```
 
-Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory. Each file is exposed as a route based on its file name.
+## 建置
 
-Images can be added to `src/assets/` and embedded in Markdown with a relative link.
+```bash
+bun run build            # 輸出到 dist/
+bun run preview          # 預覽建置結果
+```
 
-Static assets, like favicons, can be placed in the `public/` directory.
+## 結構
 
-## 🧞 Commands
+```text
+src/content/docs/        # 頁面（.md、.mdx），檔名就是網址
+astro.config.mjs         # 網站設定與側邊欄
+src/styles/custom.css    # 樣式微調
+```
 
-All commands are run from the root of the project, from a terminal:
+新增頁面後要在 `astro.config.mjs` 的 `sidebar` 加一列，才會出現在側邊欄。
 
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `bun install`             | Installs dependencies                            |
-| `bun dev`             | Starts local dev server at `localhost:4321`      |
-| `bun build`           | Build your production site to `./dist/`          |
-| `bun preview`         | Preview your build locally, before deploying     |
-| `bun astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `bun astro -- --help` | Get help using the Astro CLI                     |
+## 檢查
 
-## 👀 Want to learn more?
+commit 時由 pre-commit 檢查（行尾空白、YAML、JSON、markdownlint、commit 訊息格式）。手動跑完整檢查：
 
-Check out [Starlight’s docs](https://starlight.astro.build/), read [the Astro documentation](https://docs.astro.build), or jump into the [Astro Discord server](https://astro.build/chat).
+```bash
+pre-commit run --all-files
+```
+
+commit 訊息格式：`<gitmoji> <type>(<scope>): <描述>`，例如 `📝 docs(ssh): 補充多帳號的設定`。
