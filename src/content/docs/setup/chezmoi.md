@@ -160,43 +160,42 @@ chezmoi status
 
 ## 平常怎麼改
 
-| 想做什麼                        | 指令                                                                                               |
-| ------------------------------- | -------------------------------------------------------------------------------------------------- |
-| 改某個設定                      | `chezmoi edit ~/.zshrc`（開來源檔），改完 `chezmoi apply`                                          |
-| 直接改了家目錄的檔，想收回 repo | `chezmoi re-add ~/.zshrc`（只適用已管理的非範本檔案）                                              |
-| 範本檔（`.tmpl`）被直接改了     | `re-add` 不支援範本。`chezmoi merge ~/.gitconfig` 開三方合併，把要留的修改寫進來源範本             |
-| 看 repo 跟家目錄差在哪          | `chezmoi diff`                                                                                     |
-| 推上 GitHub                     | `chezmoi cd` 進入來源目錄，檢查內容後依序 `git add`、`git commit`、`git push`                      |
-| 拉其他電腦推上來的改動          | `chezmoi update` 會拉取並套用。想先預覽，可用 `chezmoi git -- pull --rebase` 後再跑 `chezmoi diff` |
-| 改了 `.chezmoi.toml.tmpl`       | 跑 `chezmoi init` 重新產生本機設定。若是拉遠端範本並願意直接套用，可用 `chezmoi update --init`     |
+| 想做什麼                       | 指令                                                                                               |
+| ------------------------------ | -------------------------------------------------------------------------------------------------- |
+| 改某個設定                     | `chezmoi edit ~/.zshrc`（開來源檔），改完 `chezmoi apply`                                          |
+| 要用家目錄版本取代非範本來源檔 | `chezmoi re-add ~/.zshrc`（假設 `.zshrc` 已受管理且來源為非範本）                                  |
+| 範本檔（`.tmpl`）被直接改了    | `chezmoi merge ~/.gitconfig` 開啟合併工具（假設 `.gitconfig` 已受管理且來源為範本）                |
+| 看 repo 跟家目錄差在哪         | `chezmoi diff`                                                                                     |
+| 推上 GitHub                    | `chezmoi cd` 進入來源目錄，檢查內容後依序 `git add`、`git commit`、`git push`                      |
+| 拉其他電腦推上來的改動         | `chezmoi update` 會拉取並套用。想先預覽，可用 `chezmoi git -- pull --rebase` 後再跑 `chezmoi diff` |
+| 改了 `.chezmoi.toml.tmpl`      | 跑 `chezmoi init` 重新產生本機設定。若是拉遠端範本並願意直接套用，可用 `chezmoi update --init`     |
 
-改完可用 `chezmoi status`、在來源 repo 用 `git status -sb` 檢查。 [chezmoi re-add](https://www.chezmoi.io/reference/commands/re-add/) · [chezmoi update](https://www.chezmoi.io/reference/commands/update/)
+`re-add` 只會收回非範本檔。`merge` 會開啟合併工具，比對家目錄內容、來源與渲染結果。把要留的變更寫進來源範本，保留範本分支。若是非範本檔且兩邊都有要留的修改，也可用 `merge`。改完用 `chezmoi diff <檔案>` 確認渲染結果，再用 `chezmoi git -- diff` 和 `chezmoi git -- status -sb` 檢查來源。 [chezmoi re-add](https://www.chezmoi.io/reference/commands/re-add/) · [chezmoi merge](https://www.chezmoi.io/reference/commands/merge/) · [chezmoi update](https://www.chezmoi.io/reference/commands/update/)
 
 ### 家目錄和 repo 不一樣時
 
-chezmoi 會記住上次寫進每個檔案的內容。檔案在那之後被手動改過，`apply` 或 `update` 就會停下來問：
+chezmoi 會記住上次寫入的檔案狀態。檔案後來有本機修改，而套用會改動它時，`apply` 或 `update` 可能詢問如何處理。以下是 chezmoi 2.74.1 的提示範例。
 
 ```text
 .zshrc has changed since chezmoi last wrote it?
-diff, overwrite, all-overwrite, skip, quit
+> diff/overwrite/all-overwrite/skip/Skip-conflicts/quit
 ```
 
-先選 `diff` 看差在哪。要保留家目錄的修改就選 `skip`，再用上表的 `re-add` 或 `merge` 收回 repo；不要的話選 `overwrite`。
-習慣先跑 `chezmoi diff`，就不會在套用途中才發現。
+先選 `diff` 看差異。選 `skip` 可保留這個檔案的本機修改，之後再用上表的方式收回 repo。確定要以來源版本取代這個檔案時，選 `overwrite`。`Skip-conflicts` 會略過後續衝突，`all-overwrite` 會一併覆蓋後續衝突，`quit` 會停止這次套用。套用前可先跑 `chezmoi diff`。 [chezmoi 如何處理本機修改](https://www.chezmoi.io/user-guide/frequently-asked-questions/usage/#what-are-the-consequences-of-bare-modifications-to-the-target-files)
 
-兩台電腦都改了 repo、都要推時，跟一般 git 一樣：後推的那台先 `chezmoi update`（會 rebase），同一行都被改過才需要到 `chezmoi cd` 裡解衝突。
+兩台電腦都提交了修改時，後推的那台可先執行 `chezmoi update --apply=false`。預設會拉取並 rebase，`--apply=false` 讓你先處理來源 repo 的變更。若 Git 回報衝突，用 `chezmoi cd` 進入來源 repo，解完衝突後用 `git add` 標記已處理的檔案，再執行 `git rebase --continue`。確認 `git status` 顯示 rebase 已完成，接著用 `chezmoi diff` 預覽、`chezmoi apply` 套用，再推送提交。 [chezmoi update](https://www.chezmoi.io/reference/commands/update/) · [Git rebase](https://git-scm.com/docs/git-rebase)
 
-chezmoi 也能在 `edit`、`add` 之後自動提交與推送（設定 `git.autoCommit`、`git.autoPush`），但每存一次檔就推一次，自動產生的提交訊息也過不了 commitizen 這類檢查，不建議開。 [chezmoi merge](https://www.chezmoi.io/reference/commands/merge/)
+建議維持 `git.autoCommit`、`git.autoPush` 的預設關閉設定。開啟後，`chezmoi edit`、`chezmoi add` 等指令完成時可能自動提交或推送，還在整理的修改也可能提早上傳。若 repo 有 commitizen 等提交訊息檢查，自動產生的預設訊息也可能不符合規範。手動提交前可用 `chezmoi git -- diff` 檢查內容。 [chezmoi 自動提交與推送](https://www.chezmoi.io/user-guide/daily-operations/#automatically-commit-and-push-changes-to-your-repo)
 
 ### 讓 AI 也照這個流程改
 
-請 AI 改 `~/.zshrc` 這類檔案時，它預設會直接改家目錄那份，下次套用就被蓋掉。可以在全域的 `~/.claude/CLAUDE.md`（Codex 是 `~/.codex/AGENTS.md`）加一條規則，而且這份檔案本身也交給 chezmoi 管理，每台電腦都會有：
+請 AI 改 `~/.zshrc` 這類檔案時，它可能直接改家目錄那份，之後套用時可能覆蓋這份修改。可以把下面的規則寫進全域 `~/.claude/CLAUDE.md`（Codex 用 `~/.codex/AGENTS.md`），再將這份規則檔交給 chezmoi 管理，就能同步到其他電腦。
 
 ```markdown
 - 家目錄的設定檔多半由 chezmoi 管理：改之前用 `chezmoi source-path <檔案>` 確認，
   有管理就先問我要寫進 chezmoi 來源（各台同步）還是只改這台。
-  寫進來源時直接改來源檔（`chezmoi edit` 會開編輯器，AI 不能用），`chezmoi diff` 確認後再 `chezmoi apply <檔案>`；
-  提交、推送要我同意才做。
+  寫進來源時直接改來源檔，保留 `.tmpl` 的範本分支。用 `chezmoi diff` 確認後再 `chezmoi apply <檔案>`。
+  提交、推送前要先取得我的同意。
 ```
 
 ## 不要放進 repo 的東西
