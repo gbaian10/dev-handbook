@@ -1,0 +1,593 @@
+---
+title: 新電腦從零開始
+description: 一台剛裝好的 Ubuntu 26.04，依序要執行哪些指令。
+---
+
+import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
+
+從剛裝好的 Ubuntu 26.04 開始，照順序做。每一步都有確認方式，確認過再往下。
+
+:::note[需要 sudo 的步驟]
+這頁標了 `sudo` 的指令都要輸入密碼，自己在終端機執行。
+:::
+
+:::tip[什麼時候要重開終端機]
+只有第 4 步（換 zsh）、第 5 步（mise）、第 7 步（語言）、第 9 步（CLI 工具）結尾要重開，每步最後的「重開終端機，確認」就是檢查點。其他步驟改完馬上生效，不用重開。
+:::
+
+<Steps>
+
+0. ### 先裝 Claude Code（選用）
+
+   想從一開始就讓 AI 帶著做，就先裝 [Claude Code](https://code.claude.com/docs)。裝好後請它讀這本書，照後面的步驟一步一步做、幫忙檢查結果；需要 `sudo` 的指令交給你自己執行。
+
+   適用桌面、WSL、自己的伺服器。**共用伺服器不要裝**：登入資訊與設定屬於個人私密檔案。
+
+   ```bash
+   # 剛裝好的系統可能還沒有 curl
+   sudo apt update && sudo apt install -y curl
+   curl -fsSL https://claude.ai/install.sh | bash
+   ```
+
+   裝在 `~/.local/bin/claude`，不需要 sudo，之後會自動更新（想馬上更新用 `claude update`）。
+   這時 PATH 可能還沒有 `~/.local/bin`（第 5 步才設定），先在目前的終端機補上，再啟動並登入：
+
+   ```bash
+   export PATH="$HOME/.local/bin:$PATH"
+   claude
+   ```
+
+   第一次執行會帶你登入 Claude 帳號；瀏覽器打不開的話（WSL、伺服器），照畫面上的網址自己開。
+
+   官方說明：[Claude Code 安裝](https://code.claude.com/docs/en/setup)
+
+1. ### 更新系統、裝基本套件
+
+   ```bash
+   sudo apt update && sudo apt full-upgrade -y
+   sudo apt install -y zsh unzip build-essential tmux xclip htop nvtop
+   ```
+
+   | 套件              | 為什麼要裝                                                           |
+   | ----------------- | -------------------------------------------------------------------- |
+   | `zsh`             | 平常用的 shell，下一步會換成登入 shell                               |
+   | `unzip`           | mise 安裝工具時，有些工具的發行檔是 zip                              |
+   | `build-essential` | gcc、make 等編譯工具。Rust 連結需要，Python 套件從原始碼編譯時也需要 |
+   | `tmux`            | 終端機分割與保留工作階段，斷線後還能接回去                           |
+   | `xclip`           | tmux 複製的內容送進系統剪貼簿；WSL 會再同步到 Windows。伺服器不用裝  |
+   | `htop`            | 看 CPU、記憶體與程序，比內建的 `top` 好讀                            |
+   | `nvtop`           | 看顯示卡使用率與顯示卡記憶體。沒有 NVIDIA、AMD、Intel 顯示卡就不用裝 |
+
+   確認：
+
+   ```bash
+   zsh --version
+   unzip -v | head -1
+   gcc --version | head -1
+   tmux -V
+   ```
+
+   這裡只用 apt 裝**系統基礎、不需要追最新版**的東西。其他 CLI 工具改用 mise 或各自的安裝程式，理由見[安裝分工](/setup/install-strategy/)。
+
+2. ### git 換成最新版
+
+   Ubuntu 內建的 git 跟著發行版走，不會升大版本。改用 git 官方維護的 PPA，之後 `apt upgrade` 就會跟著上游更新。
+
+   ```bash
+   sudo add-apt-repository -y ppa:git-core/ppa
+   sudo apt update && sudo apt install -y git
+   ```
+
+   確認：
+
+   ```bash
+   git --version
+   ```
+
+   2026-11 時 Ubuntu 26.04 內建的是 2.53.0，PPA 提供 2.56.1（與上游最新版相同）。
+
+   官方說明：[git Linux 安裝](https://git-scm.com/downloads/linux)、[git-core PPA](https://launchpad.net/~git-core/+archive/ubuntu/ppa)
+
+   :::tip[為什麼不用 mise 裝 git]
+   mise 沒有預先編好的 git，會從原始碼編譯；而且系統其他工具仍然會呼叫 `/usr/bin/git`，最後會有兩份。git 用 PPA 就好。
+   :::
+
+3. ### git 基本設定
+
+   寫好 `~/.gitconfig` 與 `~/.config/git/ignore`，每一行的說明見 [git 設定](/git/config/)。
+   用 dotfiles 工具管理的話，這一步會在套用 dotfiles 時一起完成。
+
+   確認：
+
+   ```bash
+   git config --global --list
+   ```
+
+   :::caution[全域 pre-commit hook 晚點再加]
+   [全域 pre-commit hook](/git/global-hooks/) 要等 pre-commit 裝好才能加。先加的話，pre-commit 還不存在，所有 repo 的 commit 都會失敗。
+   :::
+
+4. ### 換成 zsh，裝 oh-my-zsh 與 powerlevel10k
+
+   把登入 shell 換成 zsh（要輸入自己的密碼）：
+
+   ```bash
+   chsh -s $(which zsh)
+   ```
+
+   成功時沒有任何輸出。目前的終端機還是原本的 shell，**先不用重開**，下面幾個指令在原本的 shell 裡照樣能跑，到這一步最後再一起重開。
+
+   裝 [oh-my-zsh](https://ohmyz.sh)：
+
+   ```bash
+   sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended --keep-zshrc
+   ```
+
+   | 參數           | 作用                                                                                |
+   | -------------- | ----------------------------------------------------------------------------------- |
+   | `--unattended` | 不詢問、不自動換 shell、裝完不立刻進 zsh。換 shell 上面已經用 `chsh` 做了           |
+   | `--keep-zshrc` | 已經有 `~/.zshrc` 就保留，不改名成 `.zshrc.pre-oh-my-zsh`。沒有的話照常從範本建一份 |
+
+   裝主題與兩個外掛，放在 oh-my-zsh 的 custom 目錄：
+
+   ```bash
+   ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+   git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$ZSH_CUSTOM/themes/powerlevel10k"
+   git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
+   git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
+   ```
+
+   | 名稱                                                                            | 做什麼                                                           |
+   | ------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+   | [powerlevel10k](https://github.com/romkatv/powerlevel10k)                       | 提示列主題：顯示目錄、git 分支與狀態、上一個指令花多久，速度很快 |
+   | [zsh-autosuggestions](https://github.com/zsh-users/zsh-autosuggestions)         | 依歷史指令用灰字提示後面的內容，按 <kbd>→</kbd> 接受             |
+   | [zsh-syntax-highlighting](https://github.com/zsh-users/zsh-syntax-highlighting) | 打字時就上色，指令打錯會變紅                                     |
+
+   官方說明：[換成 zsh](https://github.com/ohmyzsh/ohmyzsh/wiki/Installing-ZSH)、[oh-my-zsh 無人值守安裝](https://github.com/ohmyzsh/ohmyzsh#unattended-install)、[powerlevel10k](https://github.com/romkatv/powerlevel10k#oh-my-zsh)、[zsh-autosuggestions](https://github.com/zsh-users/zsh-autosuggestions/blob/master/INSTALL.md#oh-my-zsh)、[zsh-syntax-highlighting](https://github.com/zsh-users/zsh-syntax-highlighting/blob/master/INSTALL.md#oh-my-zsh)
+
+   和官方寫法的差異：`--keep-zshrc` 是安裝腳本支援的參數（官方範例只寫 `--unattended`）；兩個外掛多加了 `--depth=1`，只抓最新版，不影響使用與更新。
+
+   在 `~/.zshrc` 啟用主題與外掛：
+
+   ```bash
+   sed -i 's|^ZSH_THEME=.*|ZSH_THEME="powerlevel10k/powerlevel10k"|' ~/.zshrc
+   sed -i 's|^plugins=(.*)$|plugins=(\n\tgit\n\tzsh-autosuggestions\n\tzsh-syntax-highlighting\n)|' ~/.zshrc
+   ```
+
+   這兩條是把範本裡原本的 `ZSH_THEME="robbyrussell"` 與 `plugins=(git)` 換掉，改完是：
+
+   ```zsh title="~/.zshrc（節錄）"
+   ZSH_THEME="powerlevel10k/powerlevel10k"
+
+   plugins=(
+   	git
+   	zsh-autosuggestions
+   	zsh-syntax-highlighting
+   )
+   ```
+
+   `plugins` 寫成一行一個，之後加外掛只要多插一行。
+
+   `zsh-syntax-highlighting` 要放在 `plugins` 的**最後一個**，它要在其他外掛之後載入才能正確上色。
+   之後要加的工具外掛（mise、uv、rust 等）一律插在 `zsh-autosuggestions` **前面**，讓兩個 `zsh-` 外掛維持在最後、排在一起。
+   mise、uv、rust 這類工具的 oh-my-zsh 外掛（補全用），等工具裝好再加進 `plugins`。
+
+   #### powerlevel10k 設定
+
+   只要還沒有 `~/.p10k.zsh`，下次進 zsh 就會跳出 powerlevel10k 的設定精靈，照問題選就好；選完會寫出 `~/.p10k.zsh`，並在 `~/.zshrc` 加上載入它的幾行。之後想重設就執行 `p10k configure`。
+
+   :::tip[不想自己選：直接用我的設定]
+   我的 `~/.p10k.zsh` 放在 [gist](https://gist.github.com/gbaian10/d3dd5ce35e8a8908e642547438b7e493)，重開終端機**之前**先下載，就不會跳出精靈。
+
+   正常跑完精靈，它會自動在 `~/.zshrc` 加兩段：**最上面**的 instant prompt（先畫出提示列、再載入其他設定，開終端機比較快），以及**最下面**載入 `~/.p10k.zsh` 的一行。
+   用 gist 就沒跑精靈，這兩段要自己加：
+
+   ```bash
+   # 下載設定
+   curl -fsSL https://gist.githubusercontent.com/gbaian10/d3dd5ce35e8a8908e642547438b7e493/raw/.p10k.zsh -o ~/.p10k.zsh
+
+   # 最下面：載入 ~/.p10k.zsh
+   echo '[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh' >> ~/.zshrc
+
+   # 最上面：instant prompt（把這段接在原本 .zshrc 的前面）
+   cat - ~/.zshrc > ~/.zshrc.new <<'EOF' && mv ~/.zshrc.new ~/.zshrc
+   if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+     source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+   fi
+
+   EOF
+   ```
+
+   最後一段：`cat -` 先印出 `<<'EOF'` 到 `EOF` 之間的文字，再印原本的 `.zshrc`，寫進新檔後取代原檔。不能直接寫 `> ~/.zshrc`，shell 會先清空檔案，原本的內容就沒了。
+
+   不要用 `p10k configure` 補這兩段：它會重跑精靈，把剛下載的 `~/.p10k.zsh` 蓋掉。
+   :::
+
+   `~/.p10k.zsh` 也建議交給 dotfiles 工具管理，新機器套用後就是熟悉的提示列。
+
+   #### 字型
+
+   powerlevel10k 的圖示需要 Nerd Font，建議用作者調整過的 [MesloLGS NF](https://github.com/romkatv/powerlevel10k#manual-font-installation)。
+   字型要裝在**畫面顯示終端機的那台機器**上，不一定是跑 shell 的那台：
+
+   <Tabs syncKey="machine">
+   <TabItem label="WSL">
+   終端機是 Windows Terminal，字型裝在 **Windows**：
+   1. 用瀏覽器下載四個字型檔（powerlevel10k 作者提供的連結）：
+      [Regular](https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Regular.ttf)、
+      [Bold](https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Bold.ttf)、
+      [Italic](https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Italic.ttf)、
+      [Bold Italic](https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Bold%20Italic.ttf)
+   2. 在檔案總管選取這四個檔 → 按右鍵 →「**為所有使用者安裝**」（只裝給自己就選「安裝」）。Windows 11 右鍵選單沒看到的話，先點「顯示其他選項」；也可以逐一雙擊字型檔，在預覽視窗按「安裝」
+   3. 開 Windows Terminal → 設定（<kbd>Ctrl</kbd>+<kbd>,</kbd>）→ 左側「設定檔」選你的 Ubuntu（例如 `Ubuntu-26.04`）→ 頁面下方「其他設定」的「外觀」→「字體」選 `MesloLGS NF` → 右下角「儲存」
+
+   想讓所有設定檔都用這個字型，改左側「預設值」→「其他設定」的「外觀」。
+
+   第 1、2 步也可以在 Windows Terminal 開一個 **PowerShell** 分頁，用指令一次做完。字型只裝給目前的 Windows 帳號，不需要系統管理員權限；已經裝過的會跳過：
+
+   ```powershell
+   $fontDir = "$env:LOCALAPPDATA\Microsoft\Windows\Fonts"
+   $reg = 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts'
+   New-Item -ItemType Directory -Force $fontDir | Out-Null
+   foreach ($style in 'Regular', 'Bold', 'Italic', 'Bold Italic') {
+     $name = "MesloLGS NF $style.ttf"
+     $dest = Join-Path $fontDir $name
+     if (Test-Path $dest) { Write-Host "已安裝，跳過：$name"; continue }
+     $url = 'https://github.com/romkatv/powerlevel10k-media/raw/master/' + [uri]::EscapeDataString($name)
+     Invoke-WebRequest $url -OutFile $dest
+     New-ItemProperty -Path $reg -Name "MesloLGS NF $style (TrueType)" -Value $dest -PropertyType String -Force | Out-Null
+   }
+   ```
+
+   確認有裝好（兩個都要列出四個 MesloLGS NF）：
+
+   ```powershell
+   Get-ChildItem "$env:LOCALAPPDATA\Microsoft\Windows\Fonts\MesloLGS*" | Select-Object Name, LastWriteTime
+   (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts').PSObject.Properties | Where-Object Name -like 'MesloLGS*' | Select-Object Name, Value
+   ```
+
+   </TabItem>
+   <TabItem label="桌面">
+   字型裝在 Ubuntu 本身：
+
+   ```bash
+   mkdir -p ~/.local/share/fonts && cd ~/.local/share/fonts
+   for f in Regular Bold Italic "Bold Italic"; do
+     curl -fsSL -o "MesloLGS NF $f.ttf" "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20${f// /%20}.ttf"
+   done
+   fc-cache -f
+   ```
+
+   再到終端機的設定選 `MesloLGS NF`。
+
+   :::caution[待實機確認]
+   這段還沒在桌面版實際做過。ghostty 可能內建 Nerd Font 圖示而不需要另外裝，確認後再更新。
+   :::
+
+   </TabItem>
+   <TabItem label="伺服器">
+   伺服器上不用裝。字型設在**你連線用的那台電腦**的終端機。
+   </TabItem>
+   </Tabs>
+
+   字型參考：
+
+   - [powerlevel10k 的字型說明](https://github.com/romkatv/powerlevel10k#fonts)：MesloLGS NF 的下載連結與各種終端機的設定方式
+   - [Nerd Fonts](https://www.nerdfonts.com/font-downloads)：把圖示加進常見程式字型的專案，想換別的字型（例如 JetBrains Mono、Fira Code）從這裡挑 Nerd Font 版本
+
+   #### 重開終端機，確認
+
+   上面都做完後，**關掉終端機、開一個新的**（Windows Terminal 開新分頁即可）。新的終端機會用 zsh 啟動，沒有 `~/.p10k.zsh` 的話會先跳出設定精靈。WSL 若新分頁仍是 bash，在 PowerShell 執行 `wsl --shutdown` 再開。
+
+   ```bash
+   echo $SHELL        # 登入 shell：/usr/bin/zsh
+   echo $0            # 目前正在跑的 shell：zsh 或 -zsh（- 代表登入 shell）
+   omz version
+   printf '\ue0b0 \ue0a0 \uf113 \uf015 \uf07c \uf00c\n'
+   ```
+
+   最後一行正常會印出實心右箭頭、git 分支、GitHub 的貓、房子、資料夾、打勾；出現方塊或問號就是字型還沒套用。
+
+5. ### 裝 mise，設定 PATH
+
+   [mise](https://mise.jdx.dev) 負責管理大部分 CLI 工具的版本，理由見[安裝分工](/setup/install-strategy/)。用官方安裝腳本裝，不需要 sudo：
+
+   ```bash
+   curl -fsSL https://mise.run | sh
+   ```
+
+   官方說明：[安裝 mise](https://mise.jdx.dev/installing-mise.html)、[入門](https://mise.jdx.dev/getting-started.html)
+
+   mise 會裝在 `~/.local/bin/mise`。接著讓 shell 找得到它和它管理的工具，分兩個地方設定：
+
+   **`~/.zshenv`**：每個 zsh 都會讀，包含執行腳本、`ssh 主機 指令`這種非互動的 shell。把 `~/.local/bin` 與 mise 的 shims 放進 PATH：
+
+   ```bash
+   cat >> ~/.zshenv <<'EOF'
+   typeset -U path PATH
+   path=($HOME/.local/bin $HOME/bin $HOME/.local/share/mise/shims $path)
+   EOF
+   ```
+
+   **`~/.zshrc`**：只有互動的 shell 會讀。在 oh-my-zsh 的 `plugins` 加上 `mise`，它會執行 `mise activate zsh`，並裝好 mise 指令的補全：
+
+   ```bash
+   sed -i 's|^\tzsh-autosuggestions$|\tmise\n\tzsh-autosuggestions|' ~/.zshrc
+   ```
+
+   | 設定                                 | 作用                                                                                                |
+   | ------------------------------------ | --------------------------------------------------------------------------------------------------- |
+   | `typeset -U path PATH`               | PATH 裡重複的路徑自動去掉，重複 `source` 也不會越疊越長                                             |
+   | shims（`~/.local/share/mise/shims`） | 每個工具一個小程式，執行時依目前目錄找對應版本。非互動的 shell 也能用                               |
+   | `mise activate`（oh-my-zsh 外掛）    | 進入目錄時直接切換 PATH，並套用 `mise.toml` 的 `[env]` 環境變數。比 shims 快，但只在互動 shell 生效 |
+
+   用了 oh-my-zsh 的 `mise` 外掛，就**不要**再在 `.zshrc` 寫 `eval "$(mise activate zsh)"`，不然會執行兩次。
+
+   **`~/.config/environment.d/999-path.conf`**：給 systemd user 服務與從桌面啟動的 GUI 程式，它們不經過 zsh。桌面必做；WSL 有要跑 systemd user 服務才需要；伺服器視情況：
+
+   ```bash
+   mkdir -p ~/.config/environment.d
+   cat > ~/.config/environment.d/999-path.conf <<'EOF'
+   PATH=${HOME}/.local/bin:${HOME}/bin:${HOME}/.local/share/mise/shims:${PATH}
+   EOF
+   ```
+
+   讓 systemd 重讀設定並確認（已經在跑的服務要重啟才會拿到新的 PATH）：
+
+   ```bash
+   systemctl --user daemon-reload
+   systemctl --user show-environment | grep '^PATH='
+   ```
+
+   :::caution[檔名要排在 99-environment.conf 後面]
+   系統內建的 `/usr/lib/environment.d/99-environment.conf`（連到 `/etc/environment`）會把 PATH **整個重設**成預設值。
+   所有 `.conf` 照檔名排序依序讀取，檔名排在它前面（例如 `10-path.conf`）加進去的路徑會被蓋掉，所以用 `999-` 開頭。
+   :::
+
+   PATH 為什麼這樣分，以及 cron 要怎麼處理，見 [PATH 擺法](/setup/path/)。
+
+   #### 重開終端機，確認
+
+   開一個新的終端機（或在原本的終端機執行 `exec zsh`）：
+
+   ```bash
+   mise --version
+   mise doctor        # 檢查 activate 與 shims 是否都生效
+   ```
+
+6. ### 用 mise 裝 gh，登入 GitHub
+
+   [gh](https://cli.github.com) 是 GitHub 官方的 CLI。用 mise 裝，順便讓它產生 SSH 金鑰、上傳到 GitHub，一次完成「能推拉」和「gh 能用」兩件事：
+
+   ```bash
+   mise use -g gh
+   gh --version
+   gh auth login
+   ```
+
+   `mise use -g` 會裝最新版，並寫進全域設定 `~/.config/mise/config.toml`。
+
+   官方說明：[gh 的 Linux 安裝方式](https://github.com/cli/cli/blob/trunk/docs/install_linux.md)、[gh auth login](https://cli.github.com/manual/gh_auth_login)
+
+   和官方的差異：gh 官方推薦加它的 apt 套件庫，這裡改用 mise（下載的是官方發布的預編譯檔），統一由 mise 升級、不需要 sudo。
+
+   `gh auth login` 是互動式的：
+
+   | 問題                                                             | 選                                      |
+   | ---------------------------------------------------------------- | --------------------------------------- |
+   | Where do you use GitHub?                                         | `GitHub.com`                            |
+   | How would you like to authenticate GitHub CLI?                   | `Login with a web browser`              |
+   | What is your preferred protocol for Git operations on this host? | `SSH`                                   |
+   | Generate a new SSH key to add to your GitHub account?            | `Yes`                                   |
+   | Enter a passphrase for your new SSH key                          | 要密碼就輸入；不要就直接 Enter          |
+   | Title for your SSH key                                           | 寫清楚是哪台機器，例如 `wsl`、`desktop` |
+
+   上表是 gh 2.105.0 的順序，版本不同可能前後調換，照問題內容選即可。
+
+   最後會顯示一組 8 碼代碼並複製到剪貼簿，按 Enter 開瀏覽器授權。
+   開不起來時（WSL、伺服器常見，會顯示 `Failed opening a web browser`），終端機不要關，自己在瀏覽器開 [github.com/login/device](https://github.com/login/device) 貼上代碼授權，gh 會接著完成。
+
+   :::tip[一台機器一把金鑰]
+   這把金鑰加在帳號的 SSH keys（不是只綁單一 repo 的 deploy key），能存取帳號有權限的所有 repo。
+   不要把別台機器的私鑰複製過來：每台各自一把、標題寫清楚，哪台不用了或外洩，到 GitHub 撤掉那一把就好。
+   :::
+
+   #### 確認
+
+   ```bash
+   gh auth status
+   ssh -T git@github.com     # 要顯示自己的帳號
+   ```
+
+   第一次 SSH 連線會問要不要信任 GitHub 的主機金鑰。對照畫面上的指紋，ED25519 應該是 `SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU`（[GitHub 官方公布的指紋](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints)），一樣才輸入 `yes`。
+   看到 `Hi 你的帳號! You've successfully authenticated` 就完成了。
+
+   :::caution[從別台 ssh 進來時，可能變成用別的帳號]
+   從另一台電腦 `ssh` 進這台、而且那邊開了 agent forwarding（`ForwardAgent yes`）時，對方 ssh-agent 裡的金鑰會被帶進來。
+   git 連 GitHub 會先試 agent 裡的金鑰，結果用**對方那台的帳號**登入：`ssh -T` 顯示別的帳號名稱，推私人 repo 出現 `Repository not found`，甚至直接用錯的身分 push 成功。
+
+   在這台的 `~/.ssh/config` 指定 GitHub 只用自己的金鑰：
+
+   ```bash
+   cat >> ~/.ssh/config <<'EOF'
+   Host github.com
+     IdentityFile ~/.ssh/id_ed25519
+     IdentitiesOnly yes
+   EOF
+   chmod 600 ~/.ssh/config
+   ```
+
+   `IdentitiesOnly yes` 表示只用 `IdentityFile` 指定的金鑰，不拿 agent 裡的其他金鑰來試。
+   :::
+
+7. ### 語言：uv、rustup、go、bun、node
+
+   Python、Rust 用各自的原生安裝程式（uv、rustup），Go、bun、node 用 mise 裝全域一份；各專案用的版本由專案自己的檔案決定。分工的理由見[語言版本管理](/setup/languages/)。
+
+   uv、rustup 裝在家目錄，不需要 sudo：
+
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | env UV_NO_MODIFY_PATH=1 sh
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
+   ```
+
+   | 工具                                           | 裝在哪            | 怎麼更新         |
+   | ---------------------------------------------- | ----------------- | ---------------- |
+   | [uv](https://docs.astral.sh/uv/)               | `~/.local/bin/uv` | `uv self update` |
+   | [rustup](https://rustup.rs)（含 rustc、cargo） | `~/.cargo/bin`    | `rustup update`  |
+
+   官方說明：[uv 安裝](https://docs.astral.sh/uv/getting-started/installation/)（[`UV_NO_MODIFY_PATH`](https://docs.astral.sh/uv/reference/installer/)）、[Rust 安裝](https://www.rust-lang.org/tools/install)（[`--no-modify-path`](https://rust-lang.github.io/rustup/installation/other.html)）
+
+   和官方的差異：rustup 多加 `-y`，用預設選項安裝、不逐項詢問。
+
+   `UV_NO_MODIFY_PATH=1` 與 `--no-modify-path` 讓安裝程式**不要自己改 shell 設定檔**，PATH 統一由我們自己管。`~/.local/bin` 已經在 PATH 裡，只要補上 `~/.cargo/bin`：
+
+   ```bash
+   sed -i 's|\$HOME/.local/share/mise/shims \$path|$HOME/.local/share/mise/shims $HOME/.cargo/bin $path|' ~/.zshenv
+   sed -i 's|/.local/share/mise/shims:\${PATH}|/.local/share/mise/shims:${HOME}/.cargo/bin:${PATH}|' ~/.config/environment.d/999-path.conf
+   systemctl --user daemon-reload
+   ```
+
+   再加上 oh-my-zsh 的 `uv`、`rust` 外掛（補全用），一樣插在 `zsh-autosuggestions` 前面：
+
+   ```bash
+   sed -i 's|^\tzsh-autosuggestions$|\tuv\n\trust\n\tzsh-autosuggestions|' ~/.zshrc
+   ```
+
+   Go、bun、node 用 mise 裝全域最新版（node 用 LTS）：
+
+   ```bash
+   mise use -g go@latest bun@latest node@lts
+   ```
+
+   #### 重開終端機，確認
+
+   開一個新的終端機（或 `exec zsh`）：
+
+   ```bash
+   uv --version
+   rustc --version && cargo --version
+   go version && bun --version && node --version
+   ```
+
+   第 0 步沒裝 Claude Code、現在想裝的話，照第 0 步的指令即可。
+
+8. ### pre-commit、commitizen 與全域 hook
+
+   兩個都是 Python 工具，用 uv 裝成獨立的指令：
+
+   ```bash
+   uv tool install pre-commit
+   uv tool install commitizen --with cz-conventional-gitmoji
+   pre-commit --version
+   cz version
+   ```
+
+   | 工具                                                                        | 做什麼                                                                              |
+   | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+   | [pre-commit](https://pre-commit.com)                                        | 依各 repo 的 `.pre-commit-config.yaml`，在 commit、push 時跑檢查                    |
+   | [commitizen](https://commitizen-tools.github.io/commitizen/)（`cz`）        | 手動寫或檢查 commit 訊息：`cz commit` 互動式填寫、`cz check` 檢查格式               |
+   | [cz-conventional-gitmoji](https://github.com/ljnsn/cz-conventional-gitmoji) | commitizen 的外掛，訊息格式是「gitmoji ＋ Conventional Commits」，例如 `✨ feat: …` |
+
+   gitmoji 外掛是給 **commitizen** 的，用 `--with` 裝進 commitizen 的環境；pre-commit 本身不用帶任何外掛。
+
+   :::note[repo 裡的 commit-msg 檢查跟這個無關]
+   repo 若要在 commit 時檢查訊息格式，會在自己的 `.pre-commit-config.yaml` 寫 commitizen 的 hook：
+
+   ```yaml
+   - repo: https://github.com/commitizen-tools/commitizen
+     rev: v4.19.3
+     hooks:
+       - id: commitizen
+         stages: [commit-msg]
+         additional_dependencies: [cz-conventional-gitmoji==0.7.0]
+   ```
+
+   pre-commit 會替這個 hook 另外建獨立環境，裝 repo 指定版本的 commitizen 與外掛。全域裝的 commitizen 只給你自己手動執行 `cz` 用。
+   :::
+
+   官方說明：[pre-commit 安裝](https://pre-commit.com/#install)、[commitizen 安裝](https://commitizen-tools.github.io/commitizen/#installation)、[cz-conventional-gitmoji](https://github.com/ljnsn/cz-conventional-gitmoji#installation)
+
+   和官方的差異：pre-commit 與 gitmoji 外掛的官方說明寫 `pip install`，這裡一律用 `uv tool install`，每個工具裝在獨立環境，不污染系統 Python（commitizen 官方推薦的全域安裝方式本來就包含 `uv tool install`）。
+
+   pre-commit 裝好、找得到之後，才加上[全域 pre-commit hook](/git/global-hooks/)（先讀那頁的風險說明）：
+
+   ```bash
+   for ev in pre-commit commit-msg pre-push; do
+     git config --global hook.pre-commit.$ev.event $ev
+     git config --global hook.pre-commit.$ev.command "pre-commit hook-impl --hook-type=$ev --skip-on-missing-config _"
+   done
+   ```
+
+   :::caution[從現在起，每個 repo 的 pre-commit 設定都會自動執行]
+   全域 hook 開啟後，任何有 `.pre-commit-config.yaml` 的 repo，**commit 和 push 時都會自動執行它設定的指令**，不用再 `pre-commit install`。
+   clone 別人的 repo 後，第一次 commit 之前先看過它的 `.pre-commit-config.yaml`，確認裡面的 hook 來源可信。
+   某些專案想跳過或關掉，見[全域 pre-commit hook](/git/global-hooks/#跳過或關掉-hook)。
+   :::
+
+   確認（`git hook list` 要在 repo 裡執行，這裡開一個暫時的）：
+
+   ```bash
+   cd "$(mktemp -d)" && git init -q
+   for ev in pre-commit commit-msg pre-push; do printf '%-11s → ' $ev; git hook list $ev; done
+   cd - >/dev/null
+   ```
+
+9. ### 用 mise 裝 CLI 工具
+
+   ```bash
+   mise use -g ripgrep fzf zoxide eza bat watchexec usage chezmoi wrangler cloudflared
+   ```
+
+   | 工具                                                                                                                                                           | 做什麼                                                       |
+   | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+   | [ripgrep](https://github.com/BurntSushi/ripgrep)（`rg`）                                                                                                       | 取代 grep：預設遞迴、尊重 `.gitignore`、快                   |
+   | [fzf](https://github.com/junegunn/fzf)                                                                                                                         | 模糊搜尋。最常用的是 <kbd>Ctrl</kbd>+<kbd>R</kbd> 搜指令歷史 |
+   | [zoxide](https://github.com/ajeetdsouza/zoxide)（`z`）                                                                                                         | 取代 cd：記住去過的目錄，`z 名稱片段` 直接跳過去             |
+   | [eza](https://github.com/eza-community/eza)                                                                                                                    | 取代 ls：有顏色、圖示、git 狀態。exa 已停止維護，eza 是後繼  |
+   | [bat](https://github.com/sharkdp/bat)                                                                                                                          | 取代 cat：語法上色、行號                                     |
+   | [watchexec](https://github.com/watchexec/watchexec)                                                                                                            | 檔案一變動就重跑指令                                         |
+   | [usage](https://usage.jdx.dev)                                                                                                                                 | mise 用來產生補全的工具                                      |
+   | [chezmoi](https://www.chezmoi.io)                                                                                                                              | 管理 dotfiles                                                |
+   | [wrangler](https://developers.cloudflare.com/workers/wrangler/)、[cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | Cloudflare：部署 Workers、建立 tunnel                        |
+
+   wrangler 在 mise 裡是透過 npm 安裝的，會用到第 7 步裝的 node。
+
+   在 `~/.zshrc` 最後加上 fzf、zoxide 的整合與 eza 的 alias（其他 alias 見 [alias 與 zfunc](/setup/zsh-custom/)）：
+
+   ```bash
+   cat >> ~/.zshrc <<'EOF'
+
+   alias ls="eza --icons=auto"
+   source <(fzf --zsh)
+   eval "$(zoxide init zsh)"
+   EOF
+   ```
+
+   | 行                          | 作用                                                                                                                            |
+   | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+   | `source <(fzf --zsh)`       | 啟用 fzf 的快捷鍵：<kbd>Ctrl</kbd>+<kbd>R</kbd> 搜歷史、<kbd>Ctrl</kbd>+<kbd>T</kbd> 選檔案、<kbd>Alt</kbd>+<kbd>C</kbd> 跳目錄 |
+   | `eval "$(zoxide init zsh)"` | 啟用 `z` 指令。zoxide 要求放在 `.zshrc` 最後面附近                                                                              |
+
+   官方說明：[fzf shell 整合](https://github.com/junegunn/fzf#setting-up-shell-integration)、[zoxide 安裝](https://github.com/ajeetdsouza/zoxide#installation)
+
+   #### 重開終端機，確認
+
+   開一個新的終端機（或 `exec zsh`）：
+
+   - <kbd>Ctrl</kbd>+<kbd>R</kbd> 出現 fzf 的歷史搜尋畫面
+   - `ls` 有圖示
+   - `cd` 進某個目錄一次，之後在別處 `z 目錄名稱片段` 能跳回去
+
+</Steps>
+
+## 接下來
+
+下面的步驟實際做過後再補進來：
+
+- [Docker 與 GPU](/setup/docker/)：要用容器或顯示卡時再裝
+- [ssh 設定](/setup/ssh/)：拆檔、多個 GitHub 帳號
+- [自己寫的小工具](/setup/scripts/)：格式化、密碼視窗與 Go 快取
+- [換電腦要手動帶走的東西](/setup/migrate/)：私鑰、token 這些不進 dotfiles 的
+- 用 chezmoi 一條指令套回設定
+- 桌面限定：字型、GNOME、輸入法、VS Code

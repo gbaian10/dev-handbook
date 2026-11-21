@@ -1,0 +1,41 @@
+---
+title: 開發環境手冊
+description: 我自己的開發環境：怎麼把一台新的 Ubuntu 裝成順手的樣子。
+template: splash
+hero:
+  tagline: 一台新的 Ubuntu，照著這本做一次，就回到熟悉的環境。
+  image:
+    file: ../../assets/houston.webp
+  actions:
+    - text: 新電腦從零開始
+      link: /setup/new-machine/
+      icon: right-arrow
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## 這本書是什麼
+
+我把累積下來的工具習慣與設定寫成一本書：每一步都附上指令、為什麼這樣做、怎麼確認做好了。
+設定檔本身用 chezmoi 管理，新電腦一條指令就能套回來；這本書負責說明。
+
+## 四種主機
+
+同一份設定會套到不同的機器上，依用途分成四種，各裝不同的範圍。
+
+<CardGrid>
+	<Card title="desktop：桌面" icon="laptop">
+		有桌面的 Ubuntu 26.04。全部都裝：開發工具、個人設定，加上 GNOME、桌面 app、systemd 服務。
+	</Card>
+	<Card title="wsl：Windows 上的 WSL" icon="seti:windows">
+		在 Windows 裡開發用的 Ubuntu。開發工具與個人設定都裝，跳過桌面相關。
+	</Card>
+	<Card title="personal-server：自己的伺服器" icon="seti:shell">
+		只有自己會登入的遠端機器，沒有桌面。開發工具與個人設定都可以放，各章會註明哪些功能要裝在這裡。
+	</Card>
+	<Card title="shared-server：共用伺服器" icon="seti:shell">
+		跟別人共用的遠端機器。只裝少量實用的 CLI 工具和 shell 設定，不放任何個人私密檔案（AI 工具設定、私人 prompt、金鑰與 token）。
+	</Card>
+</CardGrid>
+
+章節裡只適用某幾種主機的步驟，會另外標出來。

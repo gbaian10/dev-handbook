@@ -1,0 +1,4 @@
+/* Keep inline code in table cells on one line; tables scroll horizontally on narrow screens. */
+.sl-markdown-content :is(td, th) code {
+	white-space: nowrap;
+}

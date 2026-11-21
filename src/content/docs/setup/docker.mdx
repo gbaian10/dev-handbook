@@ -1,0 +1,181 @@
+---
+title: Docker 與 GPU
+description: 在 Ubuntu 與 WSL 裝原生的 Docker Engine，再讓容器用得到 NVIDIA 顯示卡。
+---
+
+import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Docker 直接裝在 Ubuntu 裡（Docker Engine），不用 Docker Desktop。WSL 也一樣：在 WSL 的 Ubuntu 裡裝 Docker Engine，步驟跟桌面完全相同。
+
+| | Docker Engine（這頁的做法） | Docker Desktop |
+| --- | --- | --- |
+| 跑在哪裡 | Ubuntu 本身，由 systemd 管理 | Windows 上的另一個程式，WSL 透過整合功能借用 |
+| 從 ssh 連進 WSL | 可以用 | 找不到 `docker`：ssh 登入時不會帶入 Windows 的 PATH |
+
+:::note[需要 sudo 的步驟]
+這頁的安裝指令都要 sudo，自己在終端機執行。
+:::
+
+<Steps>
+
+1. **安裝 Docker Engine**
+
+   官方說明：[Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
+
+   先移除可能衝突的套件。新裝的系統什麼都沒有，顯示沒有可移除的套件是正常的：
+
+   ```bash
+   sudo apt remove $(dpkg --get-selections docker.io docker-compose docker-compose-v2 docker-doc docker-buildx podman-docker containerd runc | cut -f1)
+   ```
+
+   加入 Docker 官方的 apt 套件庫：
+
+   ```bash
+   sudo apt update
+   sudo apt install ca-certificates curl
+   sudo install -m 0755 -d /etc/apt/keyrings
+   sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+   sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+   sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+   Types: deb
+   URIs: https://download.docker.com/linux/ubuntu
+   Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+   Components: stable
+   Architectures: $(dpkg --print-architecture)
+   Signed-By: /etc/apt/keyrings/docker.asc
+   EOF
+
+   sudo apt update
+   ```
+
+   安裝：
+
+   ```bash
+   sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+   ```
+
+   不用 Ubuntu 自己的 `docker.io` 套件：版本比較舊，也沒有 buildx、compose 外掛。
+   Ubuntu 上 Docker 預設開機自動啟動，不用另外 `systemctl enable`。
+
+   確認：
+
+   ```bash
+   sudo docker run --rm hello-world   # 印出 Hello from Docker!
+   ```
+
+2. **不用 sudo 就能跑 docker**
+
+   官方說明：[Linux post-installation steps](https://docs.docker.com/engine/install/linux-postinstall/)
+
+   ```bash
+   sudo groupadd docker          # 安裝時通常已經建好，顯示已存在是正常的
+   sudo usermod -aG docker $USER
+   ```
+
+   :::caution[docker 群組等於 root]
+   能用 docker 就能用容器掛載整個系統、以 root 身分改任何檔案。只把自己加進去，不要加共用帳號。
+   :::
+
+   群組只在登入時讀取一次。**關掉終端機重開**（WSL 就開一個新分頁）才會生效。
+   只想在目前的 shell 先用，可以執行 `newgrp docker`。
+
+   確認：
+
+   ```bash
+   id -nG | grep -w docker      # 有印出 docker
+   docker run --rm hello-world  # 不加 sudo 也能跑
+   ```
+
+   沒重開就跑 `docker`，會看到 `permission denied while trying to connect to the docker API at unix:///var/run/docker.sock`。
+
+3. **顯示卡驅動**
+
+   沒有 NVIDIA 顯示卡的機器，到這裡就結束了。
+
+   <Tabs syncKey="machine">
+   <TabItem label="WSL">
+   **驅動裝在 Windows 上，WSL 裡什麼都不用裝。** Windows 的 NVIDIA 驅動會把 GPU 函式庫放在 WSL 的 `/usr/lib/wsl/lib`，WSL 直接用這份。要更新驅動也是在 Windows 上更新。
+
+   :::danger[不要在 WSL 裡裝 Linux 版 NVIDIA 驅動]
+   會蓋掉 Windows 提供的那份，GPU 反而用不了。
+   :::
+
+   確認（`nvidia-smi` 不一定在 PATH 裡，所以寫完整路徑）：
+
+   ```bash
+   /usr/lib/wsl/lib/nvidia-smi   # 印出顯示卡型號與驅動版本
+   ```
+   </TabItem>
+   <TabItem label="桌面">
+   用 Ubuntu 的工具自動挑選並安裝建議的驅動，裝完重開機：
+
+   ```bash
+   sudo ubuntu-drivers install
+   sudo reboot
+   ```
+
+   官方說明：[Ubuntu：Install NVIDIA drivers](https://documentation.ubuntu.com/server/how-to/graphics/install-nvidia-drivers/)
+
+   確認：
+
+   ```bash
+   nvidia-smi   # 印出顯示卡型號與驅動版本
+   ```
+
+   :::caution[待實機確認]
+   這段還沒在桌面版實際做過，確認後再更新。
+   :::
+   </TabItem>
+   <TabItem label="伺服器">
+   依機器而定：雲端主機通常已經裝好，或由雲端廠商提供映像檔。先跑 `nvidia-smi`，有輸出就跳過這步。
+   </TabItem>
+   </Tabs>
+
+4. **讓 Docker 用得到 GPU：NVIDIA Container Toolkit**
+
+   官方說明：[Installing the NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+
+   它負責在容器啟動時，把主機的 GPU 函式庫與裝置接進容器。容器裡不用裝驅動。
+
+   ```bash
+   sudo apt-get update && sudo apt-get install -y --no-install-recommends \
+      ca-certificates \
+      curl \
+      gnupg2
+
+   curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
+     && curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+       sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+       sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+   sudo apt-get update
+   sudo apt-get install -y nvidia-container-toolkit
+   ```
+
+   和官方的差異：官方用 `NVIDIA_CONTAINER_TOOLKIT_VERSION` 把四個套件鎖在同一個版本。這裡只裝 `nvidia-container-toolkit`，另外三個由 apt 依相依性自動帶入，之後 `apt upgrade` 會一起更新。
+
+   設定 Docker 使用 nvidia runtime（會寫入 `/etc/docker/daemon.json`），再重啟 Docker：
+
+   ```bash
+   sudo nvidia-ctk runtime configure --runtime=docker
+   sudo systemctl restart docker
+   ```
+
+   確認：
+
+   ```bash
+   docker info | grep -i runtimes
+   # Runtimes: io.containerd.runc.v2 nvidia runc
+
+   docker run --rm --runtime=nvidia --gpus all ubuntu nvidia-smi
+   # 印出跟主機一樣的 nvidia-smi 表格，看得到顯示卡型號
+   ```
+
+</Steps>
+
+## WSL 要注意的地方
+
+- **跟 Docker Desktop 分開**：Windows 上如果也裝了 Docker Desktop，它設定裡對這個發行版的 WSL integration 保持關閉。兩邊的映像、容器、volume 各自一份，互不相通。
+- **`docker` 指令會用哪一個**：Docker Engine 裝好後，`/usr/bin/docker` 在 PATH 裡排在 Windows 路徑前面，不會用到 Docker Desktop 放進來的轉接程式。沒裝之前，在 Windows Terminal 裡打 `docker` 會找到那個轉接程式，並出現 `The command 'docker' could not be found in this WSL 2 distro`。
+- **port 衝突**：WSL 用 mirrored 網路時跟 Windows 共用 port。Docker Desktop 和 WSL 裡的 Docker 同時發布同一個 port，後啟動的那個會失敗。
