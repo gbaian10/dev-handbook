@@ -164,12 +164,40 @@ chezmoi status
 | ------------------------------- | -------------------------------------------------------------------------------------------------- |
 | 改某個設定                      | `chezmoi edit ~/.zshrc`（開來源檔），改完 `chezmoi apply`                                          |
 | 直接改了家目錄的檔，想收回 repo | `chezmoi re-add ~/.zshrc`（只適用已管理的非範本檔案）                                              |
+| 範本檔（`.tmpl`）被直接改了     | `re-add` 不支援範本。`chezmoi merge ~/.gitconfig` 開三方合併，把要留的修改寫進來源範本             |
 | 看 repo 跟家目錄差在哪          | `chezmoi diff`                                                                                     |
 | 推上 GitHub                     | `chezmoi cd` 進入來源目錄，檢查內容後依序 `git add`、`git commit`、`git push`                      |
 | 拉其他電腦推上來的改動          | `chezmoi update` 會拉取並套用。想先預覽，可用 `chezmoi git -- pull --rebase` 後再跑 `chezmoi diff` |
 | 改了 `.chezmoi.toml.tmpl`       | 跑 `chezmoi init` 重新產生本機設定。若是拉遠端範本並願意直接套用，可用 `chezmoi update --init`     |
 
 改完可用 `chezmoi status`、在來源 repo 用 `git status -sb` 檢查。 [chezmoi re-add](https://www.chezmoi.io/reference/commands/re-add/) · [chezmoi update](https://www.chezmoi.io/reference/commands/update/)
+
+### 家目錄和 repo 不一樣時
+
+chezmoi 會記住上次寫進每個檔案的內容。檔案在那之後被手動改過，`apply` 或 `update` 就會停下來問：
+
+```text
+.zshrc has changed since chezmoi last wrote it?
+diff, overwrite, all-overwrite, skip, quit
+```
+
+先選 `diff` 看差在哪。要保留家目錄的修改就選 `skip`，再用上表的 `re-add` 或 `merge` 收回 repo；不要的話選 `overwrite`。
+習慣先跑 `chezmoi diff`，就不會在套用途中才發現。
+
+兩台電腦都改了 repo、都要推時，跟一般 git 一樣：後推的那台先 `chezmoi update`（會 rebase），同一行都被改過才需要到 `chezmoi cd` 裡解衝突。
+
+chezmoi 也能在 `edit`、`add` 之後自動提交與推送（設定 `git.autoCommit`、`git.autoPush`），但每存一次檔就推一次，自動產生的提交訊息也過不了 commitizen 這類檢查，不建議開。 [chezmoi merge](https://www.chezmoi.io/reference/commands/merge/)
+
+### 讓 AI 也照這個流程改
+
+請 AI 改 `~/.zshrc` 這類檔案時，它預設會直接改家目錄那份，下次套用就被蓋掉。可以在全域的 `~/.claude/CLAUDE.md`（Codex 是 `~/.codex/AGENTS.md`）加一條規則，而且這份檔案本身也交給 chezmoi 管理，每台電腦都會有：
+
+```markdown
+- 家目錄的設定檔多半由 chezmoi 管理：改之前用 `chezmoi source-path <檔案>` 確認，
+  有管理就先問我要寫進 chezmoi 來源（各台同步）還是只改這台。
+  寫進來源時直接改來源檔（`chezmoi edit` 會開編輯器，AI 不能用），`chezmoi diff` 確認後再 `chezmoi apply <檔案>`；
+  提交、推送要我同意才做。
+```
 
 ## 不要放進 repo 的東西
 
