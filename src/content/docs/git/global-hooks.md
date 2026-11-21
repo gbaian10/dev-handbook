@@ -44,11 +44,11 @@ done
 
 官方的全域範例設定 `pre-commit` 事件，這裡再依相同格式加入 `commit-msg` 與 `pre-push`。 [pre-commit 的設定式 hook 說明](https://pre-commit.com/#usage-with-git-254-hook-configuration) · [git hook 手冊](https://git-scm.com/docs/git-hook)
 
-| 地方                            | 為什麼                                                                                                         |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| hook 名稱用 `pre-commit.<事件>` | 依 pre-commit 的命名慣例，避開 Git 已知的事件名稱                                                              |
-| 結尾的 `--`                     | 把 pre-commit 的選項和 Git 傳給 hook 的位置參數分開，讓 `commit-msg` 能收到訊息檔名，`pre-push` 能收到遠端資訊 |
-| `--skip-on-missing-config`      | 沒有 `.pre-commit-config.yaml` 的 repo 直接跳過，不然每個 repo 都會報錯                                        |
+| 地方                            | 為什麼                                                                                                                                                              |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| hook 名稱用 `pre-commit.<事件>` | 依 pre-commit 的命名慣例，避開 Git 已知的事件名稱                                                                                                                   |
+| 結尾的 `--`                     | pre-commit 會丟掉選項後面的第一個參數，這裡要放一個佔位，寫法跟 pre-commit 自己產生的 hook 腳本相同。少了它，`commit-msg` 收不到訊息檔名，`pre-push` 收不到遠端資訊 |
+| `--skip-on-missing-config`      | 沒有 `.pre-commit-config.yaml` 的 repo 直接跳過，不然每個 repo 都會報錯                                                                                             |
 
 :::note[名稱不含點會怎樣]
 早期常見的寫法是區段名直接用事件名（`[hook "pre-commit"]`），在 2.54 可以用，升到 2.55 後會出現：
