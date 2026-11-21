@@ -38,8 +38,8 @@ export default defineConfig({
 					],
 				},
 				{
-					// 觀念頁：說明為什麼這樣分工，不是照著做的步驟。網址仍在 setup/ 底下，連結不用改
-					label: '觀念',
+					// 背景知識：說明為什麼這樣分工，不是照著做的步驟。網址仍在 setup/ 底下，連結不用改
+					label: '背景知識',
 					items: [
 						{ label: '安裝分工', slug: 'setup/install-strategy' },
 						{ label: '語言版本管理', slug: 'setup/languages' },
