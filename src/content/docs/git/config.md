@@ -33,14 +33,14 @@ description: 全域的 ~/.gitconfig 與 ~/.config/git/ignore，每一行在做�
 	lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=relative
 ```
 
-| 設定                        | 作用                                                                                   |
-| --------------------------- | -------------------------------------------------------------------------------------- |
-| `init.defaultBranch = main` | `git init` 建出來的分支叫 main                                                         |
-| `core.autocrlf = input`     | commit 時把 CRLF 轉成 LF，checkout 不轉。Linux 上用這個，避免從 Windows 帶進 CRLF      |
-| `core.editor = code --wait` | commit 訊息、rebase 等用 VS Code 編輯。沒有 VS Code 的機器（例如共用伺服器）改成 `vim` |
-| `push.default = current`    | `git push` 不帶參數時推到同名的遠端分支，新分支第一次推也不用寫 `-u origin <分支>`     |
-| `alias.s`、`cm`             | `git s` ＝ `git status`，`git cm "訊息"` ＝ `git commit -m "訊息"`                     |
-| `alias.l`、`lg`             | 一行一個 commit 的彩色 log；`lg` 多了分支圖與相對時間                                  |
+| 設定                        | 作用                                                                                                                                  |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `init.defaultBranch = main` | `git init` 建出來的分支叫 main                                                                                                        |
+| `core.autocrlf = input`     | 將判定為文字的檔案加入索引時，把 CRLF 轉成 LF。checkout 不做相反轉換，可由 repo 的 `.gitattributes` 指定個別規則                      |
+| `core.editor = code --wait` | commit 訊息、rebase 等用 VS Code 編輯。沒有 VS Code 的機器（例如共用伺服器）改成 `vim`                                                |
+| `push.default = current`    | `git push` 無指定 refspec 時，推到同名的遠端分支。若還要設定 upstream，可用 `git push -u origin <分支>` 或啟用 `push.autoSetupRemote` |
+| `alias.s`、`cm`             | `git s` ＝ `git status`，`git cm "訊息"` ＝ `git commit -m "訊息"`                                                                    |
+| `alias.l`、`lg`             | 一行一個 commit 的彩色 log；`lg` 多了分支圖與相對時間                                                                                 |
 
 ## git 全域忽略檔
 
@@ -48,7 +48,7 @@ description: 全域的 ~/.gitconfig 與 ~/.config/git/ignore，每一行在做�
 
 所有 repo 共用的 ignore，只放**個人工具產生、不該進任何 repo** 的檔案。專案自己的產物仍然寫在各 repo 的 `.gitignore`。
 
-這是 git 預設會讀的位置（`core.excludesFile` 的預設值），`.gitconfig` 裡不用另外設定。
+未設定 `core.excludesFile` 時，Git 預設讀取 `$XDG_CONFIG_HOME/git/ignore`。未設定 `XDG_CONFIG_HOME` 時，預設位置就是 `~/.config/git/ignore`。
 網路上常見的 `~/.gitignore_global` 是早年流傳的慣例，要多寫一行 `core.excludesfile` 才會生效。
 
 ```text title="~/.config/git/ignore"
@@ -114,6 +114,8 @@ git check-ignore -v mise.local.toml   # 會顯示是 ~/.config/git/ignore 的哪
 
 `~/personal/` 底下的 repo 都會改用這份的 `user`；其他地方照舊。路徑結尾的 `/` 不能省，代表「這個目錄底下全部」。
 
+在該目錄下的 repo 執行 `git config --show-origin --get user.email`，應該會看到個人設定檔與個人 email。
+
 ## 多個 GitHub 帳號
 
 ssh 端先替個人帳號取一個主機別名（例如 `github.personal`），見 [ssh 設定〈多個 GitHub 帳號〉](/setup/ssh/#多個-github-帳號)。
@@ -128,7 +130,7 @@ GitHub 提供的 SSH clone 網址使用 `github.com`。用 `insteadOf`，從網�
 ```
 
 - 網址開頭符合 `insteadOf` 的，連線時改成前面的 `url`；三行分別對應 ssh、https、`ssh://` 三種網址寫法
-- 只改**個人帳號底下**的 repo，公司帳號的網址開頭不同，不受影響
+- 這個範例匹配網址中的擁有者前綴。由其他帳號或組織擁有的 repo 繼續走原網址
 - `git remote -v` 與 `git remote get-url origin` 顯示的是改寫後的網址。要看原值，用 `git config --get remote.origin.url`
 - 私人 repo 的 https 網址也會改走 ssh，所以不用另外設定 https 的登入
 
@@ -150,5 +152,7 @@ git ls-remote --get-url 'https://github.com/<個人帳號>/<repo>.git'
 ## 參考連結
 
 - [git-config：url.\<base\>.insteadOf](https://git-scm.com/docs/git-config#Documentation/git-config.txt-urlbaseinsteadOf)
+- [git-config：Git 設定檔與條件式 include](https://git-scm.com/docs/git-config)
+- [gitignore：忽略規則來源與優先順序](https://git-scm.com/docs/gitignore)
 
 - [GitAlias](https://github.com/GitAlias/gitalias)：整理好的大量 git alias，挑需要的複製進 `[alias]`

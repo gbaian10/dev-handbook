@@ -3,7 +3,7 @@ title: ssh 設定
 description: 用 Include 把 ~/.ssh/config 拆成多個檔，哪些交給 dotfiles、哪些每台自己放；多個 GitHub 帳號怎麼分。
 ---
 
-主機一多，`~/.ssh/config` 就會變成一大串。拆成多個檔之後，**每台都一樣的**交給 dotfiles 管理，**只有某台才需要的**（公司、客戶的主機）每台自己放。
+主機一多，`~/.ssh/config` 就會變成一大串。拆成多個檔之後，共用的非機密設定交給 dotfiles 管理，組織或合作方的連線設定只放在有相應存取權限的主機。
 
 ## 拆成多個檔
 
@@ -23,11 +23,11 @@ Host * !github.personal
 
 ```text title="~/.ssh/config.d/"
 personal.conf    ← 每台都一樣的個人主機，交給 dotfiles
-work.conf        ← 公司主機，只放在公司電腦
-vendor.conf      ← 客戶、廠商的主機
+work.conf        ← 組織的連線設定，只放在獲授權的主機
+vendor.conf      ← 合作方的連線設定
 ```
 
-- 資料夾要自己建：`mkdir -p ~/.ssh/config.d && chmod 700 ~/.ssh/config.d`，裡面的檔案設成 600
+- 用 `mkdir -p ~/.ssh/config.d && chmod 700 ~/.ssh ~/.ssh/config.d` 建目錄。各設定檔存好後設成 600，例如 `chmod 600 ~/.ssh/config ~/.ssh/config.d/personal.conf`
 - `*.conf` 依**檔名排序**讀進來；資料夾不存在或是空的都不會報錯。備份檔取名成 `work.conf.bak` 這種不是 `.conf` 結尾的，就不會被讀進去
 - 改完不用重新載入：ssh 每次連線都重新讀設定
 - Ubuntu 的系統設定 `/etc/ssh/ssh_config` 也用 `Include /etc/ssh/ssh_config.d/*.conf`
@@ -67,7 +67,7 @@ ssh -vvv -G "$host" 2>&1 | rg 'Reading configuration' # 依序讀了哪些檔
 
 ## 多個 GitHub 帳號
 
-同一台電腦有公司和個人兩個 GitHub 帳號時，個人帳號另取一個主機別名，指定自己的金鑰：
+同一台電腦有工作和個人兩個 GitHub 帳號時，個人帳號另取一個主機別名。先為個人帳號準備金鑰並將公鑰登記到 GitHub，再調整範例的私鑰路徑。 [GitHub 的 SSH 金鑰設定](https://docs.github.com/en/authentication/connecting-to-github-with-ssh)
 
 ```text title="~/.ssh/config.d/personal.conf"
 Host github.personal
@@ -77,7 +77,7 @@ Host github.personal
   IdentityAgent none
 ```
 
-clone 個人的 repo 時用別名：`git clone git@github.personal:<帳號>/<repo>.git`。公司帳號照常用 `github.com`。
+clone 個人 repo 時用別名，例如 `git clone git@github.personal:username/project.git`。將 `username/project` 換成實際的擁有者與 repo 名稱。工作帳號照常用 `github.com`。
 
 確認三個選項的分工：
 
@@ -100,7 +100,7 @@ ssh -T git@github.personal
 
 ## ForwardAgent
 
-`ForwardAgent yes` 會把你的 ssh agent 轉給連到的主機，讓你在那台上也能用本機的金鑰（例如在伺服器上 `git pull`）。代價是：那台主機上有 root 權限的人，可以趁你連線期間借用你的金鑰登入別的地方。
+`ForwardAgent yes` 會讓遠端主機上的程式向本機的 SSH agent 要求簽署，例如在伺服器上執行 `git pull`。遠端具備存取轉送 socket 權限的程序也能在連線期間要求簽署，所以只在信任且確實需要的主機啟用。
 
 - `Host *` 預設寫 `no`，真的需要的主機在自己的區塊寫 `yes`
 - 經跳板機連線用 `ProxyJump` 就好，不需要轉發 agent：`ProxyJump` 是從你這台直接認證
@@ -128,7 +128,12 @@ Remote - SSH 系列的擴充套件提供 `ssh_config` 這個語言模式（語�
 | `ssh`  | 用戶端，你連出去時執行             | `~/.ssh/config`、`/etc/ssh/ssh_config`                  | 每次執行都重新讀     |
 | `sshd` | 伺服器，在被連的機器上等別人連進來 | `/etc/ssh/sshd_config`、`/etc/ssh/sshd_config.d/*.conf` | 啟動或重新載入時讀取 |
 
-本頁的設定適用於用戶端。要接受連線才需要安裝 `openssh-server`。Ubuntu 自 22.10 起預設使用 socket activation，先查 `systemctl status ssh.socket ssh.service` 確認目前的模式。Ubuntu 24.04 LTS 起，啟用 `ssh.socket` 時，systemd generator 會從 sshd 設定讀取埠號與地址。變更後先用 `sudo sshd -t` 檢查語法，再執行 `sudo systemctl daemon-reload` 和 `sudo systemctl restart ssh.socket`，最後從另一個終端機測試新連線。較舊或曾升級的系統可能有獨立的 socket override，先用 `systemctl cat ssh.socket` 確認。
+需要接受連線的 Ubuntu 主機才需要安裝 `openssh-server`。共用伺服器的服務設定由管理員處理。先查 `systemctl status ssh.socket ssh.service` 確認啟動模式，再用 `sudo sshd -t` 檢查修改後的設定。
+
+- 使用 `ssh.socket` 時，Ubuntu 24.04 LTS 起會由 systemd generator 讀取 sshd 設定的埠號與位址。先用 `systemctl cat ssh.socket` 查有無獨立的覆寫設定，再執行 `sudo systemctl daemon-reload` 和 `sudo systemctl restart ssh.socket`。
+- 由 `ssh.service` 直接監聽時，依 Ubuntu 的文件執行 `sudo systemctl restart ssh.service`。
+
+保留原連線，從另一個終端機測試新連線，再關閉原工作階段。 [Ubuntu 的 OpenSSH 伺服器說明](https://documentation.ubuntu.com/server/how-to/security/openssh-server/)
 
 ## 參考連結
 

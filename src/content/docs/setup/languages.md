@@ -34,7 +34,7 @@ description: Python、Rust、Go、TypeScript／JavaScript（bun、node）各用�
 mise use -g go@latest bun@latest node@lts
 ```
 
-會寫進 `~/.config/mise/config.toml`，之後 `mise upgrade` 一次升級。
+會寫進 `~/.config/mise/config.toml`，用 `mise ls` 確認。之後可用 `mise upgrade` 檢查並更新這些版本要求。 [mise use 手冊](https://mise.jdx.dev/cli/use.html)
 
 ## 各語言的專案設定
 
@@ -47,6 +47,8 @@ uv run python --version # uv 會自動下載並使用這個版本
 
 `pyproject.toml` 的 `requires-python` 表示「這個專案支援哪些版本」，`.python-version` 表示「開發時用哪一版」。
 
+在專案目錄執行命令，選擇符合 `requires-python` 的版本。若專案已有符合的 Python，uv 可直接使用。 [uv 的 Python 版本管理](https://docs.astral.sh/uv/concepts/python-versions/)
+
 ### Rust
 
 ```toml title="rust-toolchain.toml"
@@ -55,7 +57,7 @@ channel = "1.100.0"
 components = ["clippy", "rustfmt"]
 ```
 
-在專案目錄執行 `cargo`，rustup 會自動裝好並切換到這個版本。
+在專案目錄執行 `cargo --version`，rustup 會安裝尚未備妥的工具鏈並採用該版本。再用 `rustup show active-toolchain` 確認。 [rustup 的工具鏈覆寫](https://rust-lang.github.io/rustup/overrides.html)
 
 ### Go
 
@@ -71,13 +73,13 @@ toolchain go1.27.4
 
 #### 實際會跑哪一版
 
-先由 PATH 決定執行哪一份 `go`（例如 mise 依 `mise.toml` 放上的版本），這份 go 再讀 `go.mod`。預設 `GOTOOLCHAIN=auto` 的規則：
+先由 PATH 決定執行哪一份 `go`（例如 mise 依 `mise.toml` 放上的版本）。在標準的 `GOTOOLCHAIN=auto` 設定下，Go 再查看目前的 `go.work`，若未使用 workspace 就查看主模組的 `go.mod`。
 
-- `toolchain` 比目前這份新 → 自動下載並改跑 `toolchain` 指定的版本
-- 沒有 `toolchain`，`go` 那行比目前新 → 改跑 `go` 那行的版本
-- 都不比目前新 → 用目前這份（Go 向下相容）
+- `toolchain default` 會停用依該檔案自動切換版本
+- `toolchain` 或 `go` 要求更高版本時，先在 PATH 找選中的工具鏈，找不到才下載
+- 已有的版本符合兩行要求時，繼續使用該版本
 
-也就是**兩者中比較新的那個**：
+以下範例都假設沒有 workspace、`go` 的最低需求是 1.26。用 `go version` 可確認實際選用的版本。
 
 | PATH 上的 go（例如 mise.toml） | go.mod 的 toolchain | 實際跑的                         |
 | ------------------------------ | ------------------- | -------------------------------- |
@@ -108,6 +110,6 @@ node --version
 
 ## 要避開的坑
 
-- **Go 的 `mise.toml` 和 `go.mod` 版本不一致**。不一致時實際跑的是兩者中較新的那個，很容易以為在用 A、其實在跑 B。要寫就兩邊寫同一版
-- **用 mise 裝的 bun 不要執行 `bun upgrade`**。它會直接覆蓋 mise 目錄裡的執行檔，mise 記錄的版本就和實際的不一致。升級用 `mise upgrade bun`
+- **Go 的 `mise.toml` 和 `go.mod` 版本不一致**。若已用 mise 選定專案開發版本，可讓它與 `toolchain` 一致，避免額外的工具鏈切換。`go` 那行仍可維持專案的最低相容需求
+- **用 mise 裝的 bun 交給 mise 更新**。`mise upgrade bun` 會在設定範圍內更新。精確釘版時，先更新專案的版本要求再執行 `mise install`
 - **Python、Rust 不要再用 mise 裝一份**。PATH 上同時有 mise 和 uv／rustup 的版本時，哪個先被找到取決於 PATH 順序，結果不容易預測

@@ -31,6 +31,7 @@ export default defineConfig({
 					label: '裝機',
 					items: [
 						{ label: '新電腦從零開始', slug: 'setup/new-machine' },
+						{ label: '用 chezmoi 管理 dotfiles', slug: 'setup/chezmoi' },
 						{ label: 'Docker 與 GPU', slug: 'setup/docker' },
 						{ label: 'alias 與 zfunc', slug: 'setup/zsh-custom' },
 						{ label: '換電腦要手動帶走的東西', slug: 'setup/migrate' },

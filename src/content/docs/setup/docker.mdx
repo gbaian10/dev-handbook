@@ -5,12 +5,13 @@ description: 在 Ubuntu 與 WSL 裝原生的 Docker Engine，再讓容器用得�
 
 import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
-Docker 直接裝在 Ubuntu 裡（Docker Engine），不用 Docker Desktop。WSL 也一樣：在 WSL 的 Ubuntu 裡裝 Docker Engine，步驟跟桌面完全相同。
+這頁在 Ubuntu 裡安裝 Docker Engine，適用 Ubuntu 桌面（`desktop`）、Windows 上的 WSL（`wsl`）與個人遠端伺服器（`personal-server`）。共用伺服器（`shared-server`）由管理員安排容器環境。
 
-| | Docker Engine（這頁的做法） | Docker Desktop |
-| --- | --- | --- |
+|          | Docker Engine（這頁的做法）  | Docker Desktop                               |
+| -------- | ---------------------------- | -------------------------------------------- |
 | 跑在哪裡 | Ubuntu 本身，由 systemd 管理 | Windows 上的另一個程式，WSL 透過整合功能借用 |
-| 從 ssh 連進 WSL | 可以用 | 找不到 `docker`：ssh 登入時不會帶入 Windows 的 PATH |
+
+WSL 需使用 WSL 2 並啟用 systemd。在 PowerShell 用 `wsl --list --verbose` 確認發行版的版本為 2，再在 WSL 的 Ubuntu 執行 `ps -p 1 -o comm=`，確認第一個程序是 `systemd`。需要啟用時，依 [Microsoft 的 WSL systemd 說明](https://learn.microsoft.com/en-us/windows/wsl/systemd)設定。
 
 :::note[需要 sudo 的步驟]
 這頁的安裝指令都要 sudo，自己在終端機執行。
@@ -22,10 +23,10 @@ Docker 直接裝在 Ubuntu 裡（Docker Engine），不用 Docker Desktop。WSL 
 
    官方說明：[Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
 
-   先移除可能衝突的套件。新裝的系統什麼都沒有，顯示沒有可移除的套件是正常的：
+   已有容器環境時，先逐一檢查可能衝突的套件。確認其他服務沒有依賴這些套件後，再用 `sudo apt remove` 加上要移除的套件名稱。新裝的系統若沒有任何相關套件，直接加入 Docker 的套件庫。
 
    ```bash
-   sudo apt remove $(dpkg --get-selections docker.io docker-compose docker-compose-v2 docker-doc docker-buildx podman-docker containerd runc | cut -f1)
+   dpkg -l docker.io docker-compose docker-compose-v2 docker-doc docker-buildx podman-docker containerd runc
    ```
 
    加入 Docker 官方的 apt 套件庫：
@@ -55,7 +56,7 @@ Docker 直接裝在 Ubuntu 裡（Docker Engine），不用 Docker Desktop。WSL 
    sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
    ```
 
-   不用 Ubuntu 自己的 `docker.io` 套件：版本比較舊，也沒有 buildx、compose 外掛。
+   這裡採用 Docker 官方套件庫，Engine、Buildx 與 Compose 外掛可由同一來源安裝及更新。
    Ubuntu 上 Docker 預設開機自動啟動，不用另外 `systemctl enable`。
 
    確認：
@@ -66,19 +67,20 @@ Docker 直接裝在 Ubuntu 裡（Docker Engine），不用 Docker Desktop。WSL 
 
 2. **不用 sudo 就能跑 docker**
 
+   這一步可選。保留預設權限時，繼續用 `sudo docker` 執行後面的指令。
+
    官方說明：[Linux post-installation steps](https://docs.docker.com/engine/install/linux-postinstall/)
 
    ```bash
-   sudo groupadd docker          # 安裝時通常已經建好，顯示已存在是正常的
-   sudo usermod -aG docker $USER
+   getent group docker || sudo groupadd docker
+   sudo usermod -aG docker "$USER"
    ```
 
    :::caution[docker 群組等於 root]
    能用 docker 就能用容器掛載整個系統、以 root 身分改任何檔案。只把自己加進去，不要加共用帳號。
    :::
 
-   群組只在登入時讀取一次。**關掉終端機重開**（WSL 就開一個新分頁）才會生效。
-   只想在目前的 shell 先用，可以執行 `newgrp docker`。
+   要立刻使用新的群組，執行 `newgrp docker` 開一個子 shell。Ubuntu 桌面要登出桌面工作階段再登入，遠端伺服器要中斷 SSH 再連線。WSL 若開新分頁後仍缺少群組，儲存工作後在 PowerShell 用 `wsl --terminate <發行版名稱>` 停掉該發行版，再開新分頁。
 
    確認：
 
@@ -87,7 +89,7 @@ Docker 直接裝在 Ubuntu 裡（Docker Engine），不用 Docker Desktop。WSL 
    docker run --rm hello-world  # 不加 sudo 也能跑
    ```
 
-   沒重開就跑 `docker`，會看到 `permission denied while trying to connect to the docker API at unix:///var/run/docker.sock`。
+   若收到 Docker socket 的 `permission denied`，先用 `id -nG` 檢查目前的工作階段是否已取得 `docker` 群組。
 
 3. **顯示卡驅動**
 
@@ -106,6 +108,8 @@ Docker 直接裝在 Ubuntu 裡（Docker Engine），不用 Docker Desktop。WSL 
    ```bash
    /usr/lib/wsl/lib/nvidia-smi   # 印出顯示卡型號與驅動版本
    ```
+
+   官方說明見 [NVIDIA 的 CUDA on WSL 指南](https://docs.nvidia.com/cuda/wsl-user-guide/index.html)。
 
    </TabItem>
    <TabItem label="桌面">
@@ -129,7 +133,7 @@ Docker 直接裝在 Ubuntu 裡（Docker Engine），不用 Docker Desktop。WSL 
    :::
    </TabItem>
    <TabItem label="伺服器">
-   依機器而定：雲端主機通常已經裝好，或由雲端廠商提供映像檔。先跑 `nvidia-smi`，有輸出就跳過這步。
+   先跑 `nvidia-smi`。若能列出顯示卡型號與驅動版本，可進到下一步。若未安裝驅動，依主機供應商的文件或 [Ubuntu 的伺服器驅動說明](https://ubuntu.com/server/docs/how-to/graphics/install-nvidia-drivers/)選擇合適的驅動。
    </TabItem>
    </Tabs>
 
@@ -143,10 +147,10 @@ Docker 直接裝在 Ubuntu 裡（Docker Engine），不用 Docker Desktop。WSL 
    sudo apt-get update && sudo apt-get install -y --no-install-recommends \
       ca-certificates \
       curl \
-      gnupg2
+      gnupg
 
    curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
-     && curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+     && curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
        sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
        sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
 
@@ -154,7 +158,7 @@ Docker 直接裝在 Ubuntu 裡（Docker Engine），不用 Docker Desktop。WSL 
    sudo apt-get install -y nvidia-container-toolkit
    ```
 
-   和官方的差異：官方用 `NVIDIA_CONTAINER_TOOLKIT_VERSION` 把四個套件鎖在同一個版本。這裡只裝 `nvidia-container-toolkit`，另外三個由 apt 依相依性自動帶入，之後 `apt upgrade` 會一起更新。
+   和官方的差異在於 Ubuntu 26.04 直接安裝 `gnupg` 以取得 `gpg` 指令。`gnupg2` 是過渡套件。這裡也省略官方範例的版本鎖定，讓 apt 安裝 `nvidia-container-toolkit` 及相依套件，之後由 `apt upgrade` 更新。 [Ubuntu 的 GnuPG 套件](https://packages.ubuntu.com/resolute/gnupg)
 
    設定 Docker 使用 nvidia runtime（會寫入 `/etc/docker/daemon.json`），再重啟 Docker：
 
@@ -166,10 +170,11 @@ Docker 直接裝在 Ubuntu 裡（Docker Engine），不用 Docker Desktop。WSL 
    確認：
 
    ```bash
-   docker info | grep -i runtimes
+   nvidia-ctk --version
+   sudo docker info | grep -i runtimes
    # Runtimes: io.containerd.runc.v2 nvidia runc
 
-   docker run --rm --runtime=nvidia --gpus all ubuntu nvidia-smi
+   sudo docker run --rm --runtime=nvidia --gpus all ubuntu nvidia-smi
    # 印出跟主機一樣的 nvidia-smi 表格，看得到顯示卡型號
    ```
 
@@ -177,6 +182,5 @@ Docker 直接裝在 Ubuntu 裡（Docker Engine），不用 Docker Desktop。WSL 
 
 ## WSL 要注意的地方
 
-- **跟 Docker Desktop 分開**：Windows 上如果也裝了 Docker Desktop，它設定裡對這個發行版的 WSL integration 保持關閉。兩邊的映像、容器、volume 各自一份，互不相通。
-- **`docker` 指令會用哪一個**：Docker Engine 裝好後，`/usr/bin/docker` 在 PATH 裡排在 Windows 路徑前面，不會用到 Docker Desktop 放進來的轉接程式。沒裝之前，在 Windows Terminal 裡打 `docker` 會找到那個轉接程式，並出現 `The command 'docker' could not be found in this WSL 2 distro`。
-- **port 衝突**：WSL 用 mirrored 網路時跟 Windows 共用 port。Docker Desktop 和 WSL 裡的 Docker 同時發布同一個 port，後啟動的那個會失敗。
+- **Docker Desktop 整合**：Windows 上若也裝了 Docker Desktop，請在 Docker Desktop 的設定中關閉這個發行版的 WSL integration，避免兩套 Docker CLI 或 daemon 設定互相干擾。兩個 Engine 各自管理映像、容器與 volume。 [Docker Desktop 的 WSL 整合](https://docs.docker.com/desktop/features/wsl/)
+- **連接埠**：Windows 與 WSL 的轉送行為取決於 NAT 或 mirrored 網路模式。兩套容器都要從 Windows 存取時，為它們選不同的主機連接埠。 [Microsoft 的 WSL 網路說明](https://learn.microsoft.com/en-us/windows/wsl/networking)

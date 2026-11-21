@@ -17,20 +17,20 @@ pre-commit 官方也因此不建議全域安裝。
 ## 需要什麼
 
 - **git 2.55 以上**。Ubuntu 26.04 內建的 2.53 還沒有設定式 hook，寫了也不會生效；用[新電腦從零開始](/setup/new-machine/)裡的 PPA 升級
-- **pre-commit 已經裝好，而且在 PATH 裡**。hook 對每個 repo 都會執行 `pre-commit`，找不到指令時 commit 會失敗
+- **pre-commit 4.6 以上，而且在 PATH 裡**。用 `git --version` 和 `pre-commit --version` 確認。啟用後，Git 找不到 `pre-commit` 時，commit 或 push 會失敗
 
 ## 設定
 
 ```ini title="~/.gitconfig（附加）"
 [hook "pre-commit.pre-commit"]
 	event = pre-commit
-	command = pre-commit hook-impl --hook-type=pre-commit --skip-on-missing-config _
+	command = pre-commit hook-impl --hook-type=pre-commit --skip-on-missing-config --
 [hook "pre-commit.commit-msg"]
 	event = commit-msg
-	command = pre-commit hook-impl --hook-type=commit-msg --skip-on-missing-config _
+	command = pre-commit hook-impl --hook-type=commit-msg --skip-on-missing-config --
 [hook "pre-commit.pre-push"]
 	event = pre-push
-	command = pre-commit hook-impl --hook-type=pre-push --skip-on-missing-config _
+	command = pre-commit hook-impl --hook-type=pre-push --skip-on-missing-config --
 ```
 
 或用指令寫入：
@@ -38,17 +38,17 @@ pre-commit 官方也因此不建議全域安裝。
 ```bash
 for ev in pre-commit commit-msg pre-push; do
   git config --global hook.pre-commit.$ev.event $ev
-  git config --global hook.pre-commit.$ev.command "pre-commit hook-impl --hook-type=$ev --skip-on-missing-config _"
+  git config --global hook.pre-commit.$ev.command "pre-commit hook-impl --hook-type=$ev --skip-on-missing-config --"
 done
 ```
 
-三個地方不能改：
+官方的全域範例設定 `pre-commit` 事件，這裡再依相同格式加入 `commit-msg` 與 `pre-push`。 [pre-commit 的設定式 hook 說明](https://pre-commit.com/#usage-with-git-254-hook-configuration) · [git hook 手冊](https://git-scm.com/docs/git-hook)
 
-| 地方 | 為什麼 |
-| --- | --- |
-| hook 名稱要含 `.`（`pre-commit.pre-commit`） | git 2.55 起，hook 名稱和事件名稱相同會直接 fatal。事件名稱都不含點，含點的名稱永遠不會撞到 |
-| 結尾的 `_` | pre-commit 會丟掉第一個參數。少了這個佔位符，commit-msg 與 pre-push 會少收一個參數而失敗 |
-| `--skip-on-missing-config` | 沒有 `.pre-commit-config.yaml` 的 repo 直接跳過，不然每個 repo 都會報錯 |
+| 地方                            | 為什麼                                                                                                         |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| hook 名稱用 `pre-commit.<事件>` | 依 pre-commit 的命名慣例，避開 Git 已知的事件名稱                                                              |
+| 結尾的 `--`                     | 把 pre-commit 的選項和 Git 傳給 hook 的位置參數分開，讓 `commit-msg` 能收到訊息檔名，`pre-push` 能收到遠端資訊 |
+| `--skip-on-missing-config`      | 沒有 `.pre-commit-config.yaml` 的 repo 直接跳過，不然每個 repo 都會報錯                                        |
 
 :::note[名稱不含點會怎樣]
 早期常見的寫法是區段名直接用事件名（`[hook "pre-commit"]`），在 2.54 可以用，升到 2.55 後會出現：
@@ -70,7 +70,7 @@ git config --global --rename-section hook.pre-push   'hook.pre-commit.pre-push'
 ## 不要再執行 pre-commit install
 
 `pre-commit install` 會在 repo 的 `.git/hooks/` 再裝一份，加上全域這份，每個 hook 會跑兩次。
-用了全域 hook，repo 的 `.git/hooks/` 底下只有 `.sample` 才是正常的。
+用了全域 hook，只要確認這三種事件沒有重複掛上 pre-commit。其他工具仍可能各自有 hook。
 
 已經裝過的 repo，在該 repo 裡移除：
 
@@ -85,24 +85,25 @@ pre-commit uninstall --hook-type pre-push
 到一個有 `.pre-commit-config.yaml` 的 repo：
 
 ```bash
-ls .git/hooks | grep -v '\.sample$'   # 應該沒有輸出
-
 for ev in pre-commit commit-msg pre-push; do
-  printf '%-11s → ' $ev; git hook list $ev
+  printf '%-11s → ' "$ev"
+  git hook list "$ev"
 done
 # pre-commit  → pre-commit.pre-commit
 # commit-msg  → pre-commit.commit-msg
 # pre-push    → pre-commit.pre-push
 ```
 
+若其中一個事件多出檔案路徑，檢查該檔案是否也是 pre-commit 產生的 hook。
+
 ## 跳過或關掉 hook
 
-| 想要 | 做法 | 範圍 |
-| --- | --- | --- |
-| 某個 repo 永遠不跑全域 hook | 在該 repo 執行下方的 `git config`（不加 `--global`） | 寫在該 repo 的 `.git/config`，不進版控；GUI 工具、systemd 服務 commit 也生效 |
-| 某個 repo 固定跳過某幾個 hook | 在該 repo 的 `mise.local.toml` 設 `SKIP` 環境變數 | 只在有啟動 mise 的終端機生效 |
-| 只跳過這一次 | `git commit --no-verify`、`git push --no-verify` | 這一次 |
-| 只關掉這一次的某個事件 | `git -c hook.pre-commit.pre-push.enabled=false push` | 這一次 |
+| 想要                          | 做法                                                 | 範圍                                                                         |
+| ----------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------- |
+| 某個 repo 永遠不跑全域 hook   | 在該 repo 執行下方的 `git config`（不加 `--global`） | 寫在該 repo 的 `.git/config`，不進版控；GUI 工具、systemd 服務 commit 也生效 |
+| 某個 repo 固定跳過某幾個 hook | 在該 repo 的 `mise.local.toml` 設 `SKIP` 環境變數    | 只在有啟動 mise 的終端機生效                                                 |
+| 只跳過這一次                  | `git commit --no-verify`、`git push --no-verify`     | 這一次                                                                       |
+| 只關掉這一次的某個事件        | `git -c hook.pre-commit.pre-push.enabled=false push` | 這一次                                                                       |
 
 ### 整個 repo 關掉
 
@@ -119,7 +120,7 @@ git hook list pre-commit   # 顯示 disabled
 
 ### 固定跳過某幾個 hook
 
-pre-commit 會讀 `SKIP` 環境變數：用逗號分隔的 **hook id**（`.pre-commit-config.yaml` 裡的 `id`），沒有「全部跳過」的寫法。
+pre-commit 會讀 `SKIP` 環境變數，值是用逗號分隔的 **hook id** 或別名。要跳過整個事件時，使用上表的 Git 選項。 [pre-commit 的單次略過說明](https://pre-commit.com/#temporarily-disabling-hooks)
 
 ```bash
 SKIP=ruff,mypy git commit -m "…"
@@ -140,5 +141,5 @@ SKIP = "ruff,mypy"
 
 ## 要知道的副作用
 
-- **單點依賴**：所有 repo 都靠這份設定，設定壞了就全部沒有檢查。特別重要的 repo 可以另外 `pre-commit install` 當第二道保險，但那個 repo 的 hook 會跑兩次
-- **PATH**：從 GUI 程式或 systemd 服務 commit 時，它們不讀 shell 設定，可能找不到 `pre-commit`。PATH 的擺法另外說明
+- **單點依賴**：所有 repo 都靠這份設定。刪除設定會停用全域檢查，命令失效則可能讓 commit 或 push 中止
+- **PATH**：GUI 程式或 systemd 服務可能找不到 `pre-commit`。見 [PATH 擺法](/setup/path/#實際案例服務裡-commit-找不到-pre-commit)

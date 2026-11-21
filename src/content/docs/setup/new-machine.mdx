@@ -7,61 +7,101 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
 
 從剛裝好的 Ubuntu 26.04 開始，照順序做。每一步都有確認方式，確認過再往下。
 
+完整流程適用於 Ubuntu 桌面（`desktop`）、Windows 上的 WSL（`wsl`）和個人遠端伺服器（`personal-server`）。在共用伺服器（`shared-server`），只選需要的 CLI 工具與 shell 設定。系統套件由管理員處理，個人登入和金鑰留在自己的裝置。
+
 :::note[需要 sudo 的步驟]
 這頁標了 `sudo` 的指令都要輸入密碼，自己在終端機執行。
 :::
 
 :::tip[什麼時候要重開終端機]
-只有第 4 步（換 zsh）、第 5 步（mise）、第 7 步（語言）、第 9 步（CLI 工具）結尾要重開，每步最後的「重開終端機，確認」就是檢查點。其他步驟改完馬上生效，不用重開。
+第 4 步更換登入 shell 後可能需要登出再登入。第 5、7、9 步改了 shell 設定，依各步結尾的方式開新 shell 再確認。
 :::
 
 <Steps>
 
-0. ### 先裝 Claude Code（選用）
+0. ### 先裝 AI 工具：Claude Code、Codex、herdr（選用）
 
-   想從一開始就讓 AI 帶著做，就先裝 [Claude Code](https://code.claude.com/docs)。裝好後請它讀這本書，照後面的步驟一步一步做、幫忙檢查結果；需要 `sudo` 的指令交給你自己執行。
+   想從一開始就讓 AI 帶著做，可以在 [Claude Code](https://code.claude.com/docs) 與 [Codex CLI](https://learn.chatgpt.com/docs/codex/cli) 中選一個。裝好後請它讀這本書、逐步核對結果。需要 `sudo` 的指令由你執行。
 
    適用桌面、WSL、自己的伺服器。**共用伺服器不要裝**：登入資訊與設定屬於個人私密檔案。
 
-   ```bash
-   # 剛裝好的系統可能還沒有 curl
-   sudo apt update && sudo apt install -y curl
-   curl -fsSL https://claude.ai/install.sh | bash
-   ```
-
-   裝在 `~/.local/bin/claude`，不需要 sudo，之後會自動更新（想馬上更新用 `claude update`）。
-   這時 PATH 可能還沒有 `~/.local/bin`（第 5 步才設定），先在目前的終端機補上，再啟動並登入：
+   剛裝好的系統可能還沒有 curl。先準備下面的安裝程式都會用到的套件，並讓目前的終端機找得到新裝的指令。
 
    ```bash
+   sudo apt update && sudo apt install -y ca-certificates curl
+   curl --version
    export PATH="$HOME/.local/bin:$PATH"
-   claude
    ```
+
+   #### Claude Code
+
+   ```bash
+   curl -fsSL https://claude.ai/install.sh | bash
+   claude --version
+   ```
+
+   官方原生安裝會把指令放在 `~/.local/bin/claude`，由 Claude Code 自動更新。想立即更新可執行 `claude update`。確認版本後執行 `claude`。
 
    第一次執行會帶你登入 Claude 帳號；瀏覽器打不開的話（WSL、伺服器），照畫面上的網址自己開。
 
    官方說明：[Claude Code 安裝](https://code.claude.com/docs/en/setup)
 
+   #### Codex CLI
+
+   官方的 Codex 原生安裝可獨立執行，預設把指令放在 `~/.local/bin/codex`。
+
+   ```bash
+   curl -fsSL https://chatgpt.com/codex/install.sh | sh
+   codex --version
+   ```
+
+   新裝且沒有其他 Codex 安裝時，前面的 `export` 讓安裝程式略過寫入 shell 設定檔。若目錄尚未在 PATH，安裝程式會依登入 shell 選設定檔，例如 Linux 的 Bash 用 `~/.bashrc`。
+
+   可在安裝程式詢問時直接啟動 Codex，或安裝後執行 `codex` 並依畫面登入。支援自我更新的版本可執行 `codex update`，也可以依官方文件重跑上面的安裝指令，再用 `codex --version` 確認。 [Codex CLI 安裝與更新](https://learn.chatgpt.com/docs/codex/cli) · [Codex CLI 指令手冊](https://learn.chatgpt.com/docs/cli/reference#codex-update)
+
+   #### herdr
+
+   [herdr](https://herdr.dev) 是給 AI 代理用的終端機工作區：在同一個畫面開多個分頁、窗格，同時跑好幾個 Claude Code 或 Codex，並看得到每個代理的狀態。只用一個代理的話可以略過。
+
+   ```bash
+   curl -fsSL https://herdr.dev/install.sh | sh
+   herdr --version
+   ```
+
+   預設裝在 `~/.local/bin/herdr`，可用 `HERDR_INSTALL_DIR` 指定其他目錄。目錄不在 PATH 時，安裝程式會列出如何加入，shell 設定檔由使用者管理。用這個安裝程式裝的版本可執行 `herdr update`，再用 `herdr --version` 確認。
+
+   官方說明見 [herdr 安裝](https://herdr.dev/tui/docs/install/)。
+
 1. ### 更新系統、裝基本套件
 
    ```bash
    sudo apt update && sudo apt full-upgrade -y
-   sudo apt install -y zsh unzip build-essential tmux xclip htop nvtop
+   sudo apt install -y ca-certificates curl openssh-client zsh unzip build-essential tmux htop
    ```
 
-   | 套件              | 為什麼要裝                                                           |
-   | ----------------- | -------------------------------------------------------------------- |
-   | `zsh`             | 平常用的 shell，下一步會換成登入 shell                               |
-   | `unzip`           | mise 安裝工具時，有些工具的發行檔是 zip                              |
-   | `build-essential` | gcc、make 等編譯工具。Rust 連結需要，Python 套件從原始碼編譯時也需要 |
-   | `tmux`            | 終端機分割與保留工作階段，斷線後還能接回去                           |
-   | `xclip`           | tmux 複製的內容送進系統剪貼簿；WSL 會再同步到 Windows。伺服器不用裝  |
-   | `htop`            | 看 CPU、記憶體與程序，比內建的 `top` 好讀                            |
-   | `nvtop`           | 看顯示卡使用率與顯示卡記憶體。沒有 NVIDIA、AMD、Intel 顯示卡就不用裝 |
+   | 套件                      | 為什麼要裝                                                           |
+   | ------------------------- | -------------------------------------------------------------------- |
+   | `zsh`                     | 平常用的 shell，第 4 步會換成登入 shell                              |
+   | `ca-certificates`、`curl` | 驗證 HTTPS 憑證並下載後續的安裝程式                                  |
+   | `openssh-client`          | 產生 SSH 金鑰並測試 GitHub SSH 連線                                  |
+   | `unzip`                   | mise 安裝工具時，有些工具的發行檔是 zip                              |
+   | `build-essential`         | gcc、make 等編譯工具。Rust 連結需要，Python 套件從原始碼編譯時也需要 |
+   | `tmux`                    | 終端機分割與保留工作階段，斷線後還能接回去                           |
+   | `htop`                    | 看 CPU、記憶體與程序，比內建的 `top` 好讀                            |
+
+   選裝套件依用途各自執行。在 Ubuntu 桌面或啟用 WSLg 的 WSL，若 tmux 剪貼簿設定需要 X11 工具，可裝 `xclip`。想監看支援的 GPU，再裝 `nvtop`。
+
+   ```bash
+   sudo apt install -y xclip
+   sudo apt install -y nvtop
+   ```
 
    確認：
 
    ```bash
    zsh --version
+   curl --version | head -1
+   ssh -V
    unzip -v | head -1
    gcc --version | head -1
    tmux -V
@@ -69,13 +109,17 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
 
    這裡只用 apt 裝**系統基礎、不需要追最新版**的東西。其他 CLI 工具改用 mise 或各自的安裝程式，理由見[安裝分工](/setup/install-strategy/)。
 
+   官方說明見 [Ubuntu 套件管理](https://documentation.ubuntu.com/server/how-to/software/package-management/)、[WSL 的 Linux GUI 應用程式](https://learn.microsoft.com/en-us/windows/wsl/tutorials/gui-apps)及 [nvtop 的支援範圍](https://github.com/Syllo/nvtop)。
+
 2. ### git 換成最新版
 
-   Ubuntu 內建的 git 跟著發行版走，不會升大版本。改用 git 官方維護的 PPA，之後 `apt upgrade` 就會跟著上游更新。
+   Ubuntu 套件庫的 git 跟著發行版走。這裡使用 Git 官網列出的 git-core PPA，方便安裝支援全域設定式 hook 的版本。
 
    ```bash
-   sudo add-apt-repository -y ppa:git-core/ppa
-   sudo apt update && sudo apt install -y git
+   sudo apt install -y software-properties-common
+   sudo add-apt-repository -y ppa:git-core/ppa &&
+     sudo apt update &&
+     sudo apt install -y git
    ```
 
    確認：
@@ -86,10 +130,12 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
 
    2026-11 時 Ubuntu 26.04 內建的是 2.53.0，PPA 提供 2.56.1（與上游最新版相同）。
 
+   Ubuntu 的精簡安裝可能缺少 `add-apt-repository`，因此比官方範例多一步安裝 `software-properties-common`。第 8 步的全域 hook 範例需要 git 2.55 以上。
+
    官方說明：[git Linux 安裝](https://git-scm.com/downloads/linux)、[git-core PPA](https://launchpad.net/~git-core/+archive/ubuntu/ppa)
 
    :::tip[為什麼不用 mise 裝 git]
-   mise 沒有預先編好的 git，會從原始碼編譯；而且系統其他工具仍然會呼叫 `/usr/bin/git`，最後會有兩份。git 用 PPA 就好。
+   mise 的工具登錄沒有 `git` 簡稱。用 PPA 更新系統的 `/usr/bin/git`，終端機與直接呼叫這個路徑的工具就能共用同一份。 [mise 的工具登錄](https://mise.jdx.dev/registry)
    :::
 
 3. ### git 基本設定
@@ -112,10 +158,10 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
    把登入 shell 換成 zsh（要輸入自己的密碼）：
 
    ```bash
-   chsh -s $(which zsh)
+   chsh -s "$(command -v zsh)"
    ```
 
-   成功時沒有任何輸出。目前的終端機還是原本的 shell，**先不用重開**，下面幾個指令在原本的 shell 裡照樣能跑，到這一步最後再一起重開。
+   用 `getent passwd "$USER" | cut -d: -f7` 確認帳號的登入 shell 已改成 zsh。目前的 shell 可以繼續執行下面的指令。
 
    裝 [oh-my-zsh](https://ohmyz.sh)：
 
@@ -223,23 +269,26 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
 
    想讓所有設定檔都用這個字型，改左側「預設值」→「其他設定」的「外觀」。
 
-   第 1、2 步也可以在 Windows Terminal 開一個 **PowerShell** 分頁，用指令一次做完。字型只裝給目前的 Windows 帳號，不需要系統管理員權限；已經裝過的會跳過：
+   第 1、2 步也可以在 Windows Terminal 開一個 **PowerShell** 分頁，用指令下載字型並登記給目前的 Windows 帳號。已有檔案時只補登記。
 
    ```powershell
    $fontDir = "$env:LOCALAPPDATA\Microsoft\Windows\Fonts"
    $reg = 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts'
    New-Item -ItemType Directory -Force $fontDir | Out-Null
+   if (-not (Test-Path $reg)) { New-Item -Path $reg -ErrorAction Stop | Out-Null }
    foreach ($style in 'Regular', 'Bold', 'Italic', 'Bold Italic') {
      $name = "MesloLGS NF $style.ttf"
      $dest = Join-Path $fontDir $name
-     if (Test-Path $dest) { Write-Host "已安裝，跳過：$name"; continue }
-     $url = 'https://github.com/romkatv/powerlevel10k-media/raw/master/' + [uri]::EscapeDataString($name)
-     Invoke-WebRequest $url -OutFile $dest
-     New-ItemProperty -Path $reg -Name "MesloLGS NF $style (TrueType)" -Value $dest -PropertyType String -Force | Out-Null
+     if (-not (Test-Path $dest)) {
+       $url = 'https://github.com/romkatv/powerlevel10k-media/raw/master/' + [uri]::EscapeDataString($name)
+       Invoke-WebRequest $url -OutFile "$dest.download" -ErrorAction Stop
+       Move-Item "$dest.download" $dest -ErrorAction Stop
+     }
+     New-ItemProperty -Path $reg -Name "MesloLGS NF $style (TrueType)" -Value $dest -PropertyType String -Force -ErrorAction Stop | Out-Null
    }
    ```
 
-   確認有裝好（兩個都要列出四個 MesloLGS NF）：
+   下面兩條指令應各列出四個 MesloLGS NF 項目。再到 Windows Terminal 的「外觀」確認能選用字型。若還沒出現，可登出 Windows 再登入，或改用檔案總管的安裝方式。 [Microsoft 的 Windows 字型管理說明](https://support.microsoft.com/en-us/windows/experience/personalization/manage-fonts-in-windows)
 
    ```powershell
    Get-ChildItem "$env:LOCALAPPDATA\Microsoft\Windows\Fonts\MesloLGS*" | Select-Object Name, LastWriteTime
@@ -260,8 +309,10 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
 
    再到終端機的設定選 `MesloLGS NF`。
 
+   用 `fc-list ':family=MesloLGS NF' family style` 確認 Ubuntu 找得到字型。
+
    :::caution[待實機確認]
-   這段還沒在桌面版實際做過。ghostty 可能內建 Nerd Font 圖示而不需要另外裝，確認後再更新。
+   Ubuntu 桌面的手動安裝尚未經實機確認。Ghostty 內建 Nerd Font 圖示，1.2 版起使用獨立的圖示字型。只需要圖示時可沿用原本的終端機字型。 [Ghostty 1.2 發行說明](https://ghostty.org/docs/install/release-notes/1-2-0)
    :::
 
    </TabItem>
@@ -277,11 +328,12 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
 
    #### 重開終端機，確認
 
-   上面都做完後，**關掉終端機、開一個新的**（Windows Terminal 開新分頁即可）。新的終端機會用 zsh 啟動，沒有 `~/.p10k.zsh` 的話會先跳出設定精靈。WSL 若新分頁仍是 bash，在 PowerShell 執行 `wsl --shutdown` 再開。
+   現在可執行 `exec zsh` 開啟 zsh，沒有 `~/.p10k.zsh` 的話會先跳出設定精靈。Ubuntu 桌面登出工作階段再登入，遠端伺服器中斷 SSH 再連線。WSL 先開新分頁，若仍是 bash，儲存工作後在 PowerShell 用 `wsl --list --verbose` 查發行版名稱，再用 `wsl --terminate <發行版名稱>` 停掉該發行版並重開分頁。 [Microsoft 的 WSL 指令](https://learn.microsoft.com/en-us/windows/wsl/basic-commands)
 
    ```bash
-   echo $SHELL        # 登入 shell：/usr/bin/zsh
-   echo $0            # 目前正在跑的 shell：zsh 或 -zsh（- 代表登入 shell）
+   getent passwd "$USER" | cut -d: -f7  # 帳號的登入 shell
+   zsh --version
+   echo "$ZSH_VERSION"                  # 目前是 zsh 時會顯示版本
    omz version
    printf '\ue0b0 \ue0a0 \uf113 \uf015 \uf07c \uf00c\n'
    ```
@@ -300,12 +352,12 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
 
    mise 會裝在 `~/.local/bin/mise`。接著讓 shell 找得到它和它管理的工具，分兩個地方設定：
 
-   **`~/.zshenv`**：每個 zsh 都會讀，包含執行腳本、`ssh 主機 指令`這種非互動的 shell。把 `~/.local/bin` 與 mise 的 shims 放進 PATH：
+   **`~/.zshenv`**：一般 zsh 啟動時都會讀，包含執行腳本、`ssh 主機 指令`這種非互動的 shell。把工具目錄、自用腳本目錄和 mise 的 shims 放進 PATH。也先放入第 7 步會用的 `~/.cargo/bin`，目錄還沒建立時可以先保留這一項。
 
    ```bash
    cat >> ~/.zshenv <<'EOF'
    typeset -U path PATH
-   path=($HOME/.local/bin $HOME/bin $HOME/.local/share/mise/shims $path)
+   path=($HOME/.local/bin $HOME/bin $HOME/.local/share/mise/shims $HOME/.cargo/bin $path)
    EOF
    ```
 
@@ -323,16 +375,16 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
 
    用了 oh-my-zsh 的 `mise` 外掛，就**不要**再在 `.zshrc` 寫 `eval "$(mise activate zsh)"`，不然會執行兩次。
 
-   **`~/.config/environment.d/999-path.conf`**：給 systemd user 服務與從桌面啟動的 GUI 程式，它們不經過 zsh。桌面必做；WSL 有要跑 systemd user 服務才需要；伺服器視情況：
+   **`~/.config/environment.d/999-path.conf`**：給 systemd 使用者服務和從它繼承環境的程式。Ubuntu 桌面若要讓圖形程式找到這些工具，或 WSL、遠端伺服器要在 systemd 使用者服務使用這些工具，再做這一段。
 
    ```bash
    mkdir -p ~/.config/environment.d
    cat > ~/.config/environment.d/999-path.conf <<'EOF'
-   PATH=${HOME}/.local/bin:${HOME}/bin:${HOME}/.local/share/mise/shims:${PATH}
+   PATH=${HOME}/.local/bin:${HOME}/bin:${HOME}/.local/share/mise/shims:${HOME}/.cargo/bin:${PATH}
    EOF
    ```
 
-   讓 systemd 重讀設定並確認（已經在跑的服務要重啟才會拿到新的 PATH）：
+   讓 systemd 重讀設定並確認。已在執行的服務要重啟，從桌面啟動的程式可能需要登出桌面再登入。
 
    ```bash
    systemctl --user daemon-reload
@@ -340,8 +392,7 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
    ```
 
    :::caution[檔名要排在 99-environment.conf 後面]
-   系統內建的 `/usr/lib/environment.d/99-environment.conf`（連到 `/etc/environment`）會把 PATH **整個重設**成預設值。
-   所有 `.conf` 照檔名排序依序讀取，檔名排在它前面（例如 `10-path.conf`）加進去的路徑會被蓋掉，所以用 `999-` 開頭。
+   如果 `/etc/environment` 有設定 PATH，後讀到的設定可能蓋掉先加的路徑。`999-path.conf` 排在系統相容用的 `99-environment.conf` 之後，可以接在當時的 PATH 前面。 [systemd 的 environment.d 手冊](https://www.freedesktop.org/software/systemd/man/latest/environment.d.html)
    :::
 
    PATH 為什麼這樣分，以及 cron 要怎麼處理，見 [PATH 擺法](/setup/path/)。
@@ -356,6 +407,8 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
    ```
 
 6. ### 用 mise 裝 gh，登入 GitHub
+
+   適用於 Ubuntu 桌面、WSL 和個人遠端伺服器。共用伺服器只需用 `mise use -g gh` 安裝 CLI，跳過這裡的登入和金鑰設定。若系統金鑰圈無法使用，gh 會把登入憑證存成明碼檔案。
 
    [gh](https://cli.github.com) 是 GitHub 官方的 CLI。用 mise 裝，順便讓它產生 SSH 金鑰、上傳到 GitHub，一次完成「能推拉」和「gh 能用」兩件事：
 
@@ -379,12 +432,12 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
    | How would you like to authenticate GitHub CLI?                   | `Login with a web browser`              |
    | What is your preferred protocol for Git operations on this host? | `SSH`                                   |
    | Generate a new SSH key to add to your GitHub account?            | `Yes`                                   |
-   | Enter a passphrase for your new SSH key                          | 要密碼就輸入；不要就直接 Enter          |
+   | Enter a passphrase for your new SSH key                          | 輸入保護私鑰的密碼                      |
    | Title for your SSH key                                           | 寫清楚是哪台機器，例如 `wsl`、`desktop` |
 
    上表是 gh 2.105.0 的順序，版本不同可能前後調換，照問題內容選即可。
 
-   最後會顯示一組 8 碼代碼並複製到剪貼簿，按 Enter 開瀏覽器授權。
+   最後會顯示一組一次性代碼，按 Enter 開瀏覽器授權。需要複製代碼時，可自行選取，或在登入時加上 `--clipboard`。
    開不起來時（WSL、伺服器常見，會顯示 `Failed opening a web browser`），終端機不要關，自己在瀏覽器開 [github.com/login/device](https://github.com/login/device) 貼上代碼授權，gh 會接著完成。
 
    :::tip[一台機器一把金鑰]
@@ -400,24 +453,28 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
    ```
 
    第一次 SSH 連線會問要不要信任 GitHub 的主機金鑰。對照畫面上的指紋，ED25519 應該是 `SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU`（[GitHub 官方公布的指紋](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints)），一樣才輸入 `yes`。
-   看到 `Hi 你的帳號! You've successfully authenticated` 就完成了。
+   看到 `Hi 你的帳號! You've successfully authenticated` 就完成了。GitHub 不提供遠端 shell，因此測試成功仍會回傳狀態碼 1。 [GitHub 的 SSH 測試說明](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/testing-your-ssh-connection)
 
    :::caution[從別台 ssh 進來時，可能變成用別的帳號]
    從另一台電腦 `ssh` 進這台、而且那邊開了 agent forwarding（`ForwardAgent yes`）時，對方 ssh-agent 裡的金鑰會被帶進來。
-   git 連 GitHub 會先試 agent 裡的金鑰，結果用**對方那台的帳號**登入：`ssh -T` 顯示別的帳號名稱，推私人 repo 出現 `Repository not found`，甚至直接用錯的身分 push 成功。
+   git 連 GitHub 時可能先試 agent 裡的金鑰，結果使用另一個帳號。用 `ssh -T` 核對 GitHub 回傳的帳號。
 
-   在這台的 `~/.ssh/config` 指定 GitHub 只用自己的金鑰：
+   若 `~/.ssh/config` 尚未建立，可用以下範例指定金鑰。已有設定時，將範例合併到既有的 GitHub 區塊，放在通用的 `Host *` 前面。用實際的私鑰路徑替換範例。
 
    ```bash
-   cat >> ~/.ssh/config <<'EOF'
+   mkdir -p -m 700 ~/.ssh
+   (
+     umask 077
+     set -C
+     cat > ~/.ssh/config <<'EOF'
    Host github.com
      IdentityFile ~/.ssh/id_ed25519
      IdentitiesOnly yes
    EOF
-   chmod 600 ~/.ssh/config
+   )
    ```
 
-   `IdentitiesOnly yes` 表示只用 `IdentityFile` 指定的金鑰，不拿 agent 裡的其他金鑰來試。
+   `set -C` 保護已有的設定檔，`umask 077` 限制新檔案的存取權限。用 `ssh -G github.com | grep '^identityfile '` 確認只列出預期的金鑰，再重跑 SSH 測試。`IdentitiesOnly yes` 仍允許符合設定的 agent 金鑰，`IdentityFile` 也會累加。可依 [ssh 設定](/setup/ssh/#先讀到的贏)檢查其他符合的區塊。
    :::
 
 7. ### 語言：uv、rustup、go、bun、node
@@ -436,17 +493,9 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
    | [uv](https://docs.astral.sh/uv/)               | `~/.local/bin/uv` | `uv self update` |
    | [rustup](https://rustup.rs)（含 rustc、cargo） | `~/.cargo/bin`    | `rustup update`  |
 
-   官方說明：[uv 安裝](https://docs.astral.sh/uv/getting-started/installation/)（[`UV_NO_MODIFY_PATH`](https://docs.astral.sh/uv/reference/installer/)）、[Rust 安裝](https://www.rust-lang.org/tools/install)（[`--no-modify-path`](https://rust-lang.github.io/rustup/installation/other.html)）
+   官方說明：[uv 安裝](https://docs.astral.sh/uv/getting-started/installation/)（[`UV_NO_MODIFY_PATH`](https://docs.astral.sh/uv/reference/installer/)）、[Rust 安裝](https://rust-lang.org/tools/install/)（[`--no-modify-path`](https://rust-lang.github.io/rustup/installation/other.html)）
 
-   和官方的差異：rustup 多加 `-y`，用預設選項安裝、不逐項詢問。
-
-   `UV_NO_MODIFY_PATH=1` 與 `--no-modify-path` 讓安裝程式**不要自己改 shell 設定檔**，PATH 統一由我們自己管。`~/.local/bin` 已經在 PATH 裡，只要補上 `~/.cargo/bin`：
-
-   ```bash
-   sed -i 's|\$HOME/.local/share/mise/shims \$path|$HOME/.local/share/mise/shims $HOME/.cargo/bin $path|' ~/.zshenv
-   sed -i 's|/.local/share/mise/shims:\${PATH}|/.local/share/mise/shims:${HOME}/.cargo/bin:${PATH}|' ~/.config/environment.d/999-path.conf
-   systemctl --user daemon-reload
-   ```
+   和官方的差異在於 rustup 多加 `-y` 採用預設選項，並用 `UV_NO_MODIFY_PATH=1` 和 `--no-modify-path` 保留第 5 步已經設定好的 PATH。
 
    再加上 oh-my-zsh 的 `uv`、`rust` 外掛（補全用），一樣插在 `zsh-autosuggestions` 前面：
 
@@ -470,7 +519,7 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
    go version && bun --version && node --version
    ```
 
-   第 0 步沒裝 Claude Code、現在想裝的話，照第 0 步的指令即可。
+   第 0 步沒裝 Claude Code 或 Codex、現在想裝的話，照第 0 步的指令即可。
 
 8. ### pre-commit、commitizen 與全域 hook
 
@@ -510,12 +559,12 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
 
    和官方的差異：pre-commit 與 gitmoji 外掛的官方說明寫 `pip install`，這裡一律用 `uv tool install`，每個工具裝在獨立環境，不污染系統 Python（commitizen 官方推薦的全域安裝方式本來就包含 `uv tool install`）。
 
-   pre-commit 裝好、找得到之後，才加上[全域 pre-commit hook](/git/global-hooks/)（先讀那頁的風險說明）：
+   確認 git 2.55 以上、pre-commit 4.6 以上且能從 PATH 執行後，可選擇設定[全域 pre-commit hook](/git/global-hooks/)。先讀該頁的風險說明。
 
    ```bash
    for ev in pre-commit commit-msg pre-push; do
      git config --global hook.pre-commit.$ev.event $ev
-     git config --global hook.pre-commit.$ev.command "pre-commit hook-impl --hook-type=$ev --skip-on-missing-config _"
+     git config --global hook.pre-commit.$ev.command "pre-commit hook-impl --hook-type=$ev --skip-on-missing-config --"
    done
    ```
 
@@ -525,7 +574,7 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
    某些專案想跳過或關掉，見[全域 pre-commit hook](/git/global-hooks/#跳過或關掉-hook)。
    :::
 
-   確認（`git hook list` 要在 repo 裡執行，這裡開一個暫時的）：
+   用暫存 repo 確認三個 hook 各列出一個以 `pre-commit.` 開頭的名稱。
 
    ```bash
    cd "$(mktemp -d)" && git init -q
@@ -539,19 +588,19 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
    mise use -g ripgrep fzf zoxide eza bat watchexec usage chezmoi wrangler cloudflared
    ```
 
-   | 工具                                                                                                                                                           | 做什麼                                                       |
-   | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-   | [ripgrep](https://github.com/BurntSushi/ripgrep)（`rg`）                                                                                                       | 取代 grep：預設遞迴、尊重 `.gitignore`、快                   |
-   | [fzf](https://github.com/junegunn/fzf)                                                                                                                         | 模糊搜尋。最常用的是 <kbd>Ctrl</kbd>+<kbd>R</kbd> 搜指令歷史 |
-   | [zoxide](https://github.com/ajeetdsouza/zoxide)（`z`）                                                                                                         | 取代 cd：記住去過的目錄，`z 名稱片段` 直接跳過去             |
-   | [eza](https://github.com/eza-community/eza)                                                                                                                    | 取代 ls：有顏色、圖示、git 狀態。exa 已停止維護，eza 是後繼  |
-   | [bat](https://github.com/sharkdp/bat)                                                                                                                          | 取代 cat：語法上色、行號                                     |
-   | [watchexec](https://github.com/watchexec/watchexec)                                                                                                            | 檔案一變動就重跑指令                                         |
-   | [usage](https://usage.jdx.dev)                                                                                                                                 | mise 用來產生補全的工具                                      |
-   | [chezmoi](https://www.chezmoi.io)                                                                                                                              | 管理 dotfiles                                                |
-   | [wrangler](https://developers.cloudflare.com/workers/wrangler/)、[cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | Cloudflare：部署 Workers、建立 tunnel                        |
+   | 工具                                                                                                                      | 做什麼                                                       |
+   | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+   | [ripgrep](https://github.com/BurntSushi/ripgrep)（`rg`）                                                                  | 取代 grep：預設遞迴、尊重 `.gitignore`、快                   |
+   | [fzf](https://github.com/junegunn/fzf)                                                                                    | 模糊搜尋。最常用的是 <kbd>Ctrl</kbd>+<kbd>R</kbd> 搜指令歷史 |
+   | [zoxide](https://github.com/ajeetdsouza/zoxide)（`z`）                                                                    | 取代 cd：記住去過的目錄，`z 名稱片段` 直接跳過去             |
+   | [eza](https://github.com/eza-community/eza)                                                                               | 取代 ls：有顏色、圖示、git 狀態。exa 已停止維護，eza 是後繼  |
+   | [bat](https://github.com/sharkdp/bat)                                                                                     | 取代 cat：語法上色、行號                                     |
+   | [watchexec](https://github.com/watchexec/watchexec)                                                                       | 檔案一變動就重跑指令                                         |
+   | [usage](https://usage.jdx.dev)                                                                                            | 用 CLI 規格產生 shell 補全與說明文件                         |
+   | [chezmoi](https://www.chezmoi.io)                                                                                         | 管理 dotfiles，見[用 chezmoi 管理 dotfiles](/setup/chezmoi/) |
+   | [wrangler](https://developers.cloudflare.com/workers/wrangler/)、[cloudflared](https://developers.cloudflare.com/tunnel/) | Cloudflare：部署 Workers、建立 tunnel                        |
 
-   wrangler 在 mise 裡是透過 npm 安裝的，會用到第 7 步裝的 node。
+   mise 從 npm registry 安裝 wrangler，執行時會用到第 7 步的 Node.js。用 `mise ls` 核對工具版本，再用 `wrangler --version` 與 `cloudflared --version` 確認指令可用。 [mise 的 npm 後端](https://mise.jdx.dev/dev-tools/backends/npm.html) · [Wrangler 的安裝說明](https://developers.cloudflare.com/workers/wrangler/install-and-update/)
 
    開發時看需要再裝：
 
@@ -559,11 +608,11 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
    mise use -g grpcurl hadolint aqua:pressly/goose
    ```
 
-   | 工具 | 做什麼 |
-   | --- | --- |
-   | [grpcurl](https://github.com/fullstorydev/grpcurl) | 像 curl 一樣從指令列呼叫 gRPC 服務 |
-   | [hadolint](https://github.com/hadolint/hadolint) | 檢查 Dockerfile 的寫法 |
-   | [goose](https://github.com/pressly/goose) | 資料庫 migration。mise 的簡稱 `goose` 指的是另一個同名工具，要寫完整的 `aqua:pressly/goose` |
+   | 工具                                               | 做什麼                                                   |
+   | -------------------------------------------------- | -------------------------------------------------------- |
+   | [grpcurl](https://github.com/fullstorydev/grpcurl) | 像 curl 一樣從指令列呼叫 gRPC 服務                       |
+   | [hadolint](https://github.com/hadolint/hadolint)   | 檢查 Dockerfile 的寫法                                   |
+   | [goose](https://github.com/pressly/goose)          | 資料庫 migration。用 `aqua:pressly/goose` 指定要裝的專案 |
 
    在 `~/.zshrc` 最後加上 fzf、zoxide 的整合與 eza 的 alias（其他 alias 見 [alias 與 zfunc](/setup/zsh-custom/)）：
 
@@ -595,10 +644,7 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
 
 ## 接下來
 
-下面的步驟實際做過後再補進來：
-
 - [Docker 與 GPU](/setup/docker/)：要用容器或顯示卡時再裝
 - [ssh 設定](/setup/ssh/)：拆檔、多個 GitHub 帳號
 - [換電腦要手動帶走的東西](/setup/migrate/)：私鑰、token 這些不進 dotfiles 的
-- 用 chezmoi 一條指令套回設定
-- 桌面限定：字型、GNOME、輸入法、VS Code
+- [用 chezmoi 管理 dotfiles](/setup/chezmoi/)：把設定收進 git repo，新電腦先預覽變更再套用
