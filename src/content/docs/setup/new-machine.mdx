@@ -553,6 +553,16 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
    ```
 
    pre-commit 會替這個 hook 另外建獨立環境，裝 repo 指定版本的 commitizen 與外掛。全域裝的 commitizen 只給你自己手動執行 `cz` 用。
+
+   光裝外掛還不會套用 gitmoji 規則：commitizen 預設用 `cz_conventional_commits` 檢查，訊息前面有 emoji 就會被擋。repo 根目錄要再放一份設定，指定改用外掛的規則：
+
+   ```toml
+   # .cz.toml（Python 專案也可以寫在 pyproject.toml）
+   [tool.commitizen]
+   name = "cz_gitmoji"
+   ```
+
+   手動執行 `cz commit`、`cz check` 也是讀這份設定，所以兩邊的規則一致。
    :::
 
    官方說明：[pre-commit 安裝](https://pre-commit.com/#install)、[commitizen 安裝](https://commitizen-tools.github.io/commitizen/#installation)、[cz-conventional-gitmoji](https://github.com/ljnsn/cz-conventional-gitmoji#installation)
