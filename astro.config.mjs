@@ -33,7 +33,6 @@ export default defineConfig({
 						{ label: '新電腦從零開始', slug: 'setup/new-machine' },
 						{ label: 'Docker 與 GPU', slug: 'setup/docker' },
 						{ label: 'alias 與 zfunc', slug: 'setup/zsh-custom' },
-						{ label: '自己寫的小工具', slug: 'setup/scripts' },
 						{ label: '換電腦要手動帶走的東西', slug: 'setup/migrate' },
 					],
 				},

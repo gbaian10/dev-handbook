@@ -553,6 +553,18 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
 
    wrangler 在 mise 裡是透過 npm 安裝的，會用到第 7 步裝的 node。
 
+   開發時看需要再裝：
+
+   ```bash
+   mise use -g grpcurl hadolint aqua:pressly/goose
+   ```
+
+   | 工具 | 做什麼 |
+   | --- | --- |
+   | [grpcurl](https://github.com/fullstorydev/grpcurl) | 像 curl 一樣從指令列呼叫 gRPC 服務 |
+   | [hadolint](https://github.com/hadolint/hadolint) | 檢查 Dockerfile 的寫法 |
+   | [goose](https://github.com/pressly/goose) | 資料庫 migration。mise 的簡稱 `goose` 指的是另一個同名工具，要寫完整的 `aqua:pressly/goose` |
+
    在 `~/.zshrc` 最後加上 fzf、zoxide 的整合與 eza 的 alias（其他 alias 見 [alias 與 zfunc](/setup/zsh-custom/)）：
 
    ```bash
@@ -587,7 +599,6 @@ import { Steps, Tabs, TabItem } from "@astrojs/starlight/components";
 
 - [Docker 與 GPU](/setup/docker/)：要用容器或顯示卡時再裝
 - [ssh 設定](/setup/ssh/)：拆檔、多個 GitHub 帳號
-- [自己寫的小工具](/setup/scripts/)：格式化、密碼視窗與 Go 快取
 - [換電腦要手動帶走的東西](/setup/migrate/)：私鑰、token 這些不進 dotfiles 的
 - 用 chezmoi 一條指令套回設定
 - 桌面限定：字型、GNOME、輸入法、VS Code
